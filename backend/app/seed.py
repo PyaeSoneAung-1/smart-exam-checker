@@ -202,6 +202,179 @@ SCORE_RANGES = {
 }
 
 
+
+# ─────────────────────────────────────────────────────────────────────
+# New: 3 extra teachers (Daw Aye Thidar Win, Daw Zin Thu Thu Myint, Daw Tar
+# Tar Khin) with subjects, midterm exams, questions and pre-graded answers.
+# ─────────────────────────────────────────────────────────────────────
+NEW_TEACHERS = [
+    ("Daw Aye Thidar Win", "dawayethidarwin@gmail.com"),
+    ("Daw Zin Thu Thu Myint", "dawzinthuthumyint@gmail.com"),
+    ("Daw Tar Tar Khin", "dawtartarkhin@gmail.com"),
+]
+
+NEW_SUBJECTS = [
+    ("Natural Language Processing", "Understanding human language with machines: tokenization, embeddings, and language models.", "dawayethidarwin@gmail.com"),
+    ("Data Mining", "Discovering patterns and knowledge from large datasets: classification, clustering, and association.", "dawzinthuthumyint@gmail.com"),
+    ("Enterprise Resource Planning", "Integrated management of core business processes: finance, HR, supply chain, and ERP implementation.", "dawtartarkhin@gmail.com"),
+]
+
+NEW_EXAMS = [
+    ("NLP Midterm Exam", "Core concepts of Natural Language Processing.", "Natural Language Processing"),
+    ("Data Mining Midterm Exam", "Core concepts of Data Mining.", "Data Mining"),
+    ("ERP Midterm Exam", "Core concepts of Enterprise Resource Planning.", "Enterprise Resource Planning"),
+]
+
+NEW_QUESTIONS = [
+    ("Natural Language Processing", "What is natural language processing (NLP) and what are its main applications?", "Natural language processing (NLP) is a field of artificial intelligence that enables computers to understand, interpret, and generate human language. Its main applications include machine translation, sentiment analysis, chatbots, speech recognition, text summarization, and information extraction. NLP combines linguistics, computer science, and machine learning to process unstructured text data.", ["natural language processing", "artificial intelligence", "machine translation", "sentiment analysis", "chatbots", "text"]),
+    ("Natural Language Processing", "Explain the difference between stemming and lemmatization.", "Stemming and lemmatization are both text normalization techniques used in NLP. Stemming removes word suffixes heuristically to produce a base form, which may not be a real word (for example, 'running' becomes 'run' but 'flies' becomes 'fli'). Lemmatization uses vocabulary and morphological analysis to return the dictionary base form, called a lemma, so 'running' becomes 'run' and 'flies' becomes 'fly'. Lemmatization is more accurate but slower and needs a lexicon, while stemming is faster but can produce non-words.", ["stemming", "lemmatization", "normalization", "base form", "lemma", "morphological"]),
+    ("Natural Language Processing", "What is a bag-of-words model and what are its limitations?", "Bag-of-words is a text representation that turns a document into a multiset of word counts, ignoring grammar and word order. Each document becomes a vector of word frequencies. Its limitations include losing word order and semantics, very high and sparse dimensionality, and failing to handle synonyms, since words with similar meanings get completely different vectors. Weighting schemes like TF-IDF and dense word embeddings are used to address some of these problems.", ["bag-of-words", "vector", "word order", "semantics", "dimensionality", "tf-idf"]),
+    ("Natural Language Processing", "Describe how a transformer-based language model works at a high level.", "A transformer is a neural network architecture based on self-attention. Input tokens are first converted into embeddings, then self-attention computes weighted relationships between every pair of tokens in parallel, allowing the model to capture context. Multi-head attention, positional encodings, and feed-forward layers form the encoder and decoder blocks. Models are pretrained on large text corpora using objectives like masked language modeling, and then fine-tuned for downstream tasks.", ["transformer", "self-attention", "embeddings", "context", "pretraining", "positional encoding"]),
+    ("Natural Language Processing", "What is the difference between supervised and unsupervised learning in NLP?", "In supervised NLP, models are trained on labeled data, such as sentiment labels or part-of-speech tags, so they learn to predict an output for new inputs. In unsupervised learning, models discover structure in unlabeled text, such as topic modeling with LDA or word embeddings like Word2Vec trained on raw corpora. Supervised learning is task-specific and needs labeled datasets, while unsupervised learning finds patterns without any labels.", ["supervised", "unsupervised", "labeled", "topic modeling", "word2vec", "word embeddings"]),
+    ("Data Mining", "What is data mining and what are its main tasks?", "Data mining is the process of discovering patterns, correlations, and useful knowledge from large datasets using techniques from statistics, machine learning, and database systems. Its main tasks include classification, clustering, regression, association rule mining, anomaly detection, and prediction. Common applications are customer segmentation, fraud detection, and market basket analysis.", ["data mining", "patterns", "classification", "clustering", "association", "prediction"]),
+    ("Data Mining", "Explain the difference between classification and clustering.", "Classification is a supervised learning task in which data items are assigned to predefined classes using a labeled training set, for example classifying emails as spam or not spam. Clustering is an unsupervised task that groups similar data points together without any prior labels, for example segmenting customers by behavior. Classification predicts known labels, while clustering discovers unknown groups in the data.", ["classification", "clustering", "supervised", "unsupervised", "labels", "groups"]),
+    ("Data Mining", "What is association rule mining and how are support and confidence computed?", "Association rule mining discovers relationships between items in transaction data, such as the market basket rule that customers who buy bread also buy butter. For a rule X implies Y, support is the fraction of transactions that contain both X and Y, and confidence is the fraction of transactions containing X that also contain Y. Lift measures how much more likely Y is when X is present compared to when it is not.", ["association rule", "support", "confidence", "market basket", "lift", "transactions"]),
+    ("Data Mining", "Describe the k-means clustering algorithm and its limitations.", "K-means partitions data into k clusters by minimizing the within-cluster variance. It starts by choosing k initial centroids, assigns every point to the nearest centroid, recomputes each centroid as the mean of its points, and repeats until convergence. Its limitations are that k must be chosen in advance, results are sensitive to initialization and outliers, it assumes spherical clusters of similar size, and it can converge to local optima.", ["k-means", "centroid", "variance", "k", "outliers", "convergence"]),
+    ("Data Mining", "What is the difference between training data and test data, and why is it important?", "Training data is used to fit the parameters of a model, while test data evaluates the model on unseen examples to measure how well it generalizes. Keeping them separate prevents overfitting, where a model memorizes the training data but performs poorly on new data. Techniques such as holdout validation and cross-validation give more reliable estimates of real-world performance.", ["training", "test", "generalization", "overfitting", "cross-validation", "unseen"]),
+    ("Enterprise Resource Planning", "What is an ERP system and what are its main benefits?", "An ERP system is integrated software that manages the core business processes of an organization, including finance, human resources, procurement, manufacturing, sales, and inventory, all sharing a single unified database. Its main benefits are real-time visibility of data, automation of processes, reduced data duplication, better decision making, and streamlined workflows across departments.", ["ERP", "integrated", "database", "finance", "inventory", "automation"]),
+    ("Enterprise Resource Planning", "Explain the difference between on-premise and cloud ERP.", "On-premise ERP is installed on the company's own servers, giving full control and data ownership, but it requires high upfront costs and in-house IT staff for maintenance. Cloud ERP, usually delivered as SaaS, is hosted by the vendor and accessed over the internet, with lower upfront cost, automatic updates, and easy scalability, but it depends on internet connectivity and vendor security practices.", ["on-premise", "cloud", "saas", "upfront cost", "scalability", "vendor"]),
+    ("Enterprise Resource Planning", "What is master data in an ERP system and why is it important?", "Master data is the core reference data shared across an organization, such as customers, vendors, products, employees, and the chart of accounts. It is important because it provides a single source of truth, so every module uses consistent and accurate information. Master data management (MDM) maintains the quality, consistency, and governance of this data across the system.", ["master data", "single source of truth", "customers", "products", "governance", "mdm"]),
+    ("Enterprise Resource Planning", "Describe the main modules typically found in an ERP system.", "Typical ERP modules include finance and accounting, human resources, procurement, inventory and supply chain management, manufacturing or production, sales and distribution, and customer relationship management (CRM). Because all modules share one database, a transaction in one area automatically updates others, for example a sales order reducing inventory and updating the finance ledger.", ["finance", "human resources", "procurement", "inventory", "supply chain", "crm"]),
+    ("Enterprise Resource Planning", "What are the key steps in an ERP implementation project?", "Key steps in an ERP implementation are requirements analysis, selection of the ERP package and vendor, project planning, system design and configuration, data migration, integration with existing systems, testing, user training, go-live, and post-implementation support. Change management and strong executive sponsorship are critical to the success of the project.", ["requirements", "configuration", "data migration", "testing", "training", "go-live"]),
+]
+
+NEW_ANSWER_POOL = [
+    ("What is natural language processing (NLP) and what are its main applications?", ["Natural language processing, or NLP, is a branch of artificial intelligence that lets computers understand, interpret, and generate human language. Main applications are machine translation, sentiment analysis, chatbots, speech recognition, and text summarization. It brings together linguistics, computer science, and machine learning to work with unstructured text.", "NLP is a field of AI that helps computers understand human language. Applications include translation, sentiment analysis, chatbots, and speech recognition. It combines linguistics and machine learning.", "NLP is about computers understanding human language, like in translation and chatbots."]),
+    ("Explain the difference between stemming and lemmatization.", ["Stemming and lemmatization both normalize words to their base form. Stemming strips suffixes with simple rules, so it is fast but can create non-words like 'fli' from 'flies'. Lemmatization uses vocabulary and morphological analysis to return the real dictionary form (the lemma), such as 'fly' from 'flies'. Lemmatization is more accurate but slower and requires a lexicon; stemming is quicker but less precise.", "Stemming removes suffixes from words to get a base form, while lemmatization returns the true dictionary form using vocabulary and morphology. Lemmatization is more accurate but slower.", "Stemming and lemmatization both reduce words to base forms. Lemmatization is more accurate than stemming."]),
+    ("What is a bag-of-words model and what are its limitations?", ["The bag-of-words model represents text as a collection of word counts without considering grammar or word order, so each document becomes a frequency vector. Its main limitations are that it loses word order and meaning, produces high-dimensional and sparse vectors, and cannot recognize synonyms, because similar words map to different dimensions. TF-IDF weighting and word embeddings help overcome some of these issues.", "Bag-of-words counts word frequencies in a document and ignores grammar and word order. It loses semantics and creates large sparse vectors, and it cannot handle synonyms well.", "Bag-of-words counts how often words appear, ignoring order, and it cannot capture meaning or synonyms."]),
+    ("Describe how a transformer-based language model works at a high level.", ["A transformer uses self-attention to process text. Tokens are converted to embeddings, and attention layers compute how every token relates to all others in parallel, capturing context. Multi-head attention, positional encodings, and feed-forward layers make up the encoder-decoder blocks. The model is pretrained on huge text corpora with objectives like masked language modeling, then fine-tuned for specific tasks.", "Transformers use self-attention to relate every token to every other token, capturing context in parallel. They are pretrained on large text and fine-tuned for tasks like translation and classification.", "A transformer is a model that uses attention to understand context in text and is trained on large amounts of data."]),
+    ("What is the difference between supervised and unsupervised learning in NLP?", ["Supervised learning in NLP trains models on labeled data, such as sentiment or part-of-speech labels, to predict outputs for new examples. Unsupervised learning finds structure in unlabeled text, for example topic modeling with LDA or word embeddings such as Word2Vec. Supervised methods are task-specific and require labeled datasets, while unsupervised methods discover patterns without labels.", "Supervised NLP uses labeled data to train models for tasks like sentiment analysis, while unsupervised NLP finds patterns in unlabeled text, like topics or word embeddings.", "Supervised learning uses labeled data; unsupervised learning works without labels."]),
+    ("What is data mining and what are its main tasks?", ["Data mining is the process of discovering patterns, correlations, and useful knowledge from large datasets using statistics, machine learning, and database techniques. The main tasks are classification, clustering, regression, association rule mining, anomaly detection, and prediction. It is widely used for customer segmentation, fraud detection, and market basket analysis.", "Data mining finds patterns in large datasets using statistics and machine learning. Main tasks include classification, clustering, and association rule mining, used in applications like fraud detection.", "Data mining is finding patterns in data, like grouping customers or detecting fraud."]),
+    ("Explain the difference between classification and clustering.", ["Classification is a supervised task where each data item is assigned to predefined classes using a labeled training set, such as spam detection. Clustering is an unsupervised task that groups similar items together without labels, such as customer segmentation. In short, classification predicts known labels, while clustering discovers unknown groups.", "Classification assigns data to known classes using labeled examples, while clustering groups similar data without labels. Classification is supervised; clustering is unsupervised.", "Classification puts data into known groups; clustering finds groups by itself."]),
+    ("What is association rule mining and how are support and confidence computed?", ["Association rule mining finds relationships between items in transaction data, like market basket analysis. For a rule X implies Y, support is the fraction of transactions containing both X and Y, while confidence is the fraction of transactions with X that also contain Y. Lift compares how much more likely Y is when X is present.", "Association rule mining finds item relationships in transactions, like bread and butter. Support is the frequency of both items together, and confidence is how often Y appears when X appears.", "Association rules find items often bought together. Support and confidence measure how strong the rule is."]),
+    ("Describe the k-means clustering algorithm and its limitations.", ["K-means partitions data into k clusters by minimizing within-cluster variance. It initializes k centroids, assigns each point to the nearest centroid, recalculates centroids as the mean of their points, and repeats until convergence. Limitations include having to choose k in advance, sensitivity to initialization and outliers, assuming spherical clusters, and the risk of local optima.", "K-means groups data into k clusters using centroids and repeated assignments. Its limits are needing k in advance and being sensitive to outliers and initialization.", "K-means clusters data into k groups. You must choose k and outliers can affect the result."]),
+    ("What is the difference between training data and test data, and why is it important?", ["Training data is used to fit a model's parameters, and test data measures performance on unseen examples to check generalization. Separating the two prevents overfitting, where the model memorizes training data but fails on new data. Holdout sets and cross-validation provide more reliable performance estimates.", "Training data fits the model and test data checks it on new examples. This separation prevents overfitting and shows how well the model generalizes.", "Training data trains the model and test data checks if it works on new data."]),
+    ("What is an ERP system and what are its main benefits?", ["An ERP system is integrated software that manages core business processes such as finance, human resources, procurement, manufacturing, sales, and inventory in one unified database. The main benefits are real-time data visibility, process automation, less data duplication, better decision making, and smoother workflows across departments.", "ERP is software that integrates business processes like finance, HR, and inventory into one system. Benefits include real-time data, automation, and better decisions.", "ERP is a system that connects company departments together using one database."]),
+    ("Explain the difference between on-premise and cloud ERP.", ["On-premise ERP runs on the company's own servers, giving full control and data ownership but requiring high upfront cost and in-house IT maintenance. Cloud ERP is hosted by the vendor as SaaS and accessed over the internet, offering lower upfront cost, automatic updates, and scalability, but relying on connectivity and vendor security.", "On-premise ERP is installed on company servers with high upfront cost, while cloud ERP is hosted by the vendor with lower cost and easier scaling.", "On-premise ERP runs on your own servers; cloud ERP runs on the vendor's servers."]),
+    ("What is master data in an ERP system and why is it important?", ["Master data is the core reference data shared across the organization, such as customers, vendors, products, employees, and the chart of accounts. It matters because it creates a single source of truth, ensuring all modules use consistent information. Master data management (MDM) keeps this data accurate, consistent, and properly governed.", "Master data is shared reference data like customers and products. It gives the organization a single source of truth so all modules use the same information.", "Master data is the important shared data like customer and product lists used across the system."]),
+    ("Describe the main modules typically found in an ERP system.", ["Typical ERP modules are finance and accounting, human resources, procurement, inventory and supply chain, manufacturing, sales and distribution, and customer relationship management (CRM). All modules share a single database, so a transaction like a sales order automatically updates inventory and finance records.", "ERP modules include finance, HR, procurement, inventory, sales, and CRM. They share one database so data flows between departments automatically.", "ERP has modules for finance, HR, inventory, and sales that work together."]),
+    ("What are the key steps in an ERP implementation project?", ["The key steps are requirements analysis, vendor and package selection, planning, configuration, data migration, integration, testing, training, go-live, and post-implementation support. Change management and executive sponsorship are critical for success.", "An ERP project goes through requirements, configuration, data migration, testing, training, and go-live. Good change management is important.", "ERP implementation includes planning, setup, testing, training, and going live."]),
+]
+
+NEW_STUDENT_LEVELS = {
+    "pyaesoneaung@gmail.com": "medium",
+    "pyaemyatphyo@gmail.com": "low",
+    "sanlinaung@gmail.com": "high",
+    "swanyeehtut@gmail.com": "medium",
+    "thurahein@gmail.com": "low",
+}
+
+
+def _seed_new_exams(db):
+    """Add 3 teachers, 3 subjects, 3 exams, 15 questions and pre-graded student
+    answers for the new exams (idempotent — safe on every startup)."""
+    # 1. Teachers
+    teacher_by_email = {}
+    for name, email in NEW_TEACHERS:
+        t = db.query(User).filter(User.email == email).first()
+        if not t:
+            t = User(name=name, email=email,
+                     hashed_password=get_password_hash(TEACHER_PASSWORD),
+                     role=UserRole.TEACHER, is_active=True)
+            db.add(t)
+            db.flush()
+        teacher_by_email[email] = t
+
+    # 2. Subjects
+    subject_by_name = {}
+    for name, desc, teacher_email in NEW_SUBJECTS:
+        s = db.query(Subject).filter(Subject.name == name).first()
+        if not s:
+            s = Subject(name=name, description=desc,
+                        teacher_id=teacher_by_email[teacher_email].id)
+            db.add(s)
+            db.flush()
+        subject_by_name[name] = s
+
+    # 3. Exams (one per new subject)
+    exam_by_subject = {}
+    for title, desc, subj_name in NEW_EXAMS:
+        e = db.query(Exam).filter(Exam.title == title).first()
+        if not e:
+            e = Exam(subject_id=subject_by_name[subj_name].id, title=title,
+                     description=desc, total_marks=50.0,
+                     time_limit_minutes=60, is_active=True,
+                     created_at=datetime.utcnow() - timedelta(days=14))
+            db.add(e)
+            db.flush()
+        exam_by_subject[subj_name] = e
+
+    # 4. Questions (5 per exam, 10 marks each)
+    questions_by_text = {}
+    for subj_name, qtext, model, keywords in NEW_QUESTIONS:
+        q = db.query(Question).filter(Question.question_text == qtext).first()
+        if not q:
+            q = Question(exam_id=exam_by_subject[subj_name].id,
+                         question_text=qtext, model_answer=model,
+                         marks=10.0, keywords=keywords)
+            db.add(q)
+            db.flush()
+        questions_by_text[qtext] = q
+    db.commit()
+
+    # 5. Students answer all 15 new questions (varied quality per student)
+    levels_ranges = {"high": SCORE_RANGES["high"],
+                     "medium": SCORE_RANGES["medium"],
+                     "low": SCORE_RANGES["low"]}
+    pool_by_text = dict(NEW_ANSWER_POOL)
+    base_time = datetime.utcnow() - timedelta(days=20)
+    created = 0
+    for email, level in NEW_STUDENT_LEVELS.items():
+        student = (db.query(User)
+                   .filter(User.email == email, User.role == UserRole.STUDENT)
+                   .first())
+        if not student:
+            logger.warning(f"  new-exam seed: student {email} not found, skipping.")
+            continue
+        for qtext, (excellent, good, weak) in pool_by_text.items():
+            q = questions_by_text[qtext]
+            existing = (db.query(StudentAnswer)
+                        .filter(StudentAnswer.question_id == q.id,
+                                StudentAnswer.student_id == student.id)
+                        .first())
+            if existing:
+                continue
+            answer_text = {"high": excellent, "medium": good, "low": weak}[level]
+            answer = StudentAnswer(question_id=q.id, student_id=student.id,
+                                   answer_text=answer_text,
+                                   submitted_at=base_time + timedelta(hours=random.randint(1, 400)))
+            db.add(answer)
+            db.flush()
+
+            sr = levels_ranges[level]
+            keyword_base = random.uniform(sr[0], sr[1])
+            similarity_base = random.uniform(sr[2], sr[3])
+            grammar_base = random.uniform(sr[4], sr[5])
+            completeness_base = random.uniform(sr[6], sr[7])
+            weighted = (keyword_base * 0.30 + similarity_base * 0.40
+                        + grammar_base * 0.15 + completeness_base * 0.15)
+            total = round(weighted * q.marks, 2)
+            db.add(Score(answer_id=answer.id,
+                         keyword_score=round(keyword_base, 4),
+                         similarity_score=round(similarity_base, 4),
+                         grammar_score=round(grammar_base, 4),
+                         completeness_score=round(completeness_base, 4),
+                         total_score=total,
+                         feedback=_feedback_for((total / q.marks) * 100),
+                         is_overridden=False))
+            created += 1
+
+    db.commit()
+    logger.info(f"New teachers/subjects/exams seeded: "
+                f"{len(NEW_TEACHERS)} teachers, {len(NEW_SUBJECTS)} subjects, "
+                f"{len(NEW_EXAMS)} exams, {len(NEW_QUESTIONS)} questions, "
+                f"{created} answers")
+
 def seed_data():
     """Seed the database with demo data if it's empty."""
     # Create tables if they don't exist
@@ -394,6 +567,7 @@ def seed_data():
         #    San Lin Aung, Swan Yee Htut, Thura Hein — each takes both exams.
         # ─────────────────────────────────────────────────────────────────────
         _seed_extra_students(db)
+        _seed_new_exams(db)
 
     except Exception as e:
         db.rollback()

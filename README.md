@@ -52,9 +52,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 On startup the app **automatically seeds the database** (see `app/seed.py`):
 
-- Creates admin, 2 teachers, 2 students, 2 subjects, 2 exams, 10 questions.
+- Creates admin, 5 teachers (2 original + 3 new), 2 students, 5 subjects
+  (Business English, Cyber Security, Natural Language Processing,
+  Data Mining, Enterprise Resource Planning), 5 exams, 25 questions.
 - **Adds the 3 extra students and their exam answers** (idempotent — runs only
   once; safe to restart).
+- The 3 new teachers each own one subject with a midterm exam, and all 5
+  students have pre-graded answers on every exam (50 + 75 = 125 answers).
 - API docs: <http://localhost:8000/docs>
 
 > The shipped `smart_exam.db` already contains the original 2 students; the first
@@ -96,11 +100,14 @@ npm run start
 | Admin   | System Admin      | admin@smartexam.com         |
 | Teacher | Daw Ni Lar Win    | dawnilarwin@gmail.com       |
 | Teacher | Daw Nwe Ni Win    | dawnweniwin@gmail.com       |
+| Teacher | Daw Aye Thidar Win   | dawayethidarwin@gmail.com      |
+| Teacher | Daw Zin Thu Thu Myint | dawzinthuthumyint@gmail.com    |
+| Teacher | Daw Tar Tar Khin     | dawtartarkhin@gmail.com        |
 | Student | Pyae Sone Aung    | pyaesoneaung@gmail.com      |
 | Student | Pyae Myat Phyo    | pyaemyatphyo@gmail.com      |
-| Student | San Lin Aung      | sanlinaung@gmail.com        | ← new
-| Student | Swan Yee Htut     | swanyeehtut@gmail.com       | ← new
-| Student | Thura Hein        | thurahein@gmail.com         | ← new
+| Student | San Lin Aung      | sanlinaung@gmail.com        |
+| Student | Swan Yee Htut     | swanyeehtut@gmail.com       |
+| Student | Thura Hein        | thurahein@gmail.com         |
 
 All passwords: `123456`
 
@@ -174,7 +181,8 @@ smart-exam-checker/
 - **spaCy / sentence-transformers slow on first run**: the NLP models download on
   first use; this only affects live answer scoring, not the seeded demo data.
 - **Want a clean database**: delete `backend/smart_exam.db` and restart the
-  backend — the full seed (all 5 students + exams) runs from scratch.
+  backend — the full seed (all 5 students, 5 teachers, 5 exams + graded
+  answers) runs from scratch.
 
 ---
 
@@ -217,8 +225,8 @@ cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8090
 ```
 
 On first start it creates and seeds a fresh `smart_exam.db` automatically
-(admin, 2 teachers, 5 students, 2 exams, 10 questions, 50 graded answers —
-passwords are all `123456`).
+(admin, 5 teachers, 5 students, 5 subjects, 5 exams, 25 questions, 125 graded
+answers — passwords are all `123456`).
 
 > If you ever want the backend on a cloud too, it can be containerized with the
 > included `backend/Dockerfile` and run on Railway / Render / Fly.io with a
