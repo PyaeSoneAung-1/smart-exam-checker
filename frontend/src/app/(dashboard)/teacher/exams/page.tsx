@@ -102,9 +102,11 @@ export default function TeacherExamsPage() {
           <p className="text-muted-foreground">Create and manage your exams</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button><Plus className="h-4 w-4 mr-2" /> Create Exam</Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button><Plus className="h-4 w-4 mr-2" /> Create Exam</Button>
+            }
+          />
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Create New Exam</DialogTitle></DialogHeader>
             <div className="space-y-4">

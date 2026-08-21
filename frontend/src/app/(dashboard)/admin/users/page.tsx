@@ -212,11 +212,13 @@ export default function AdminUsersPage() {
         <div className="flex gap-2">
           {/* CSV Import Button */}
           <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
-            <DialogTrigger>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" /> Import CSV
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <Button variant="outline">
+                  <Upload className="h-4 w-4 mr-2" /> Import CSV
+                </Button>
+              }
+            />
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Bulk Import Users</DialogTitle>
@@ -285,9 +287,11 @@ export default function AdminUsersPage() {
 
           {/* Single Add Button */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add User</Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <Button><Plus className="h-4 w-4 mr-2" /> Add User</Button>
+              }
+            />
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>

@@ -105,9 +105,11 @@ export default function AdminSubjectsPage() {
           <p className="text-muted-foreground">Manage subjects across the system</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <Button><Plus className="h-4 w-4 mr-2" /> Create Subject</Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button><Plus className="h-4 w-4 mr-2" /> Create Subject</Button>
+            }
+          />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Subject</DialogTitle>
