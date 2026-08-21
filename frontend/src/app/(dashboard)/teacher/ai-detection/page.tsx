@@ -57,6 +57,13 @@ export default function TeacherAIDetectionPage() {
         <p className="text-muted-foreground">
           Detect AI-generated content in student answers using multi-signal analysis
         </p>
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Results are a statistical signal, not proof. Short or technical answers can
+            be misjudged — always review suspicious answers manually before acting.
+          </span>
+        </div>
       </div>
 
       <Tabs defaultValue="scan" className="space-y-4">
