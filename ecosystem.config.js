@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'smart-exam-backend',
-      cwd: '/root/hermes-workspace/smart-exam-checker/backend',
+      cwd: '/www/wwwroot/exam.hiroshi.cloud/backend',
       script: 'venv/bin/python',
       args: '-m uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1',
       interpreter: 'none',
@@ -14,7 +14,7 @@ module.exports = {
     },
     {
       name: 'smart-exam-frontend',
-      cwd: '/root/hermes-workspace/smart-exam-checker/frontend',
+      cwd: '/www/wwwroot/exam.hiroshi.cloud/frontend',
       script: 'node_modules/next/dist/bin/next',
       args: 'start',
       interpreter: 'none',
