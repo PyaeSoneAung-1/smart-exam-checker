@@ -274,3 +274,33 @@ AI_MAX_TOKENS=512
   can score as AI-like — this is inherent to perplexity-based detectors.
 - Short answers (< ~20 characters) are never flagged.
 - Detection is statistical, not proof: treat results as a signal for manual review.
+
+---
+
+## 11. Plagiarism detection — semantic upgrade
+
+**Teacher → Plagiarism Check** now uses two signals per student pair:
+
+| Signal | Catches | Implementation |
+|--------|---------|----------------|
+| **Lexical** | exact copies & light edits | TF-IDF cosine over word 1-2 grams (threshold from Admin settings) |
+| **Semantic** (when enabled) | paraphrased copies — same meaning, different words | sentence embeddings (`all-MiniLM-L6-v2`) — flags pairs at ≥ 0.92 semantic similarity |
+
+Every pair reports `similarity`, `tfidf_similarity`, `semantic_similarity` and
+`method` (lexical / semantic), and the summary includes `semantic_enabled`.
+
+The embedding model is loaded lazily and **falls back to lexical-only** when
+not installed — same `requirements-ai.txt` as AI Detection:
+
+```bash
+cd backend
+pip install -r requirements-ai.txt
+```
+
+Notes:
+
+- Two students who both answer a question correctly will *share* vocabulary
+  and get a moderate semantic score (~0.8-0.9) — that alone does **not** flag.
+  Only near-identical meaning (≥ 0.92) or lexical matches above the settings
+  threshold are flagged.
+- Results are a signal for teacher review, not proof of copying.

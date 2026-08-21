@@ -1,17 +1,21 @@
-# Optional dependencies for REAL AI-generated-text detection.
+# Optional dependencies for REAL AI-generated-text detection AND semantic
+# plagiarism detection.
 #
-# Install only if you want the AI Detection feature to use an actual
-# language model (GPTZero-style perplexity + burstiness) instead of the
-# built-in phrase heuristics:
+# Install to enable:
+#   * AI Detection → language-model perplexity + burstiness (distilgpt2)
+#   * Plagiarism   → semantic similarity layer (all-MiniLM-L6-v2) that catches
+#                    paraphrased copies on top of the lexical TF-IDF matching
 #
 #     pip install -r requirements-ai.txt
 #
-# On first AI-detection request the model (distilgpt2, ~330 MB) is downloaded
-# automatically to ~/.cache/huggingface (set HF_HOME to relocate it).
-# Requires roughly 1 GB free RAM once loaded. The API falls back to
-# heuristics automatically when these are missing, so the app still runs.
+# On first use the models download automatically to ~/.cache/huggingface
+# (distilgpt2 ~330 MB, all-MiniLM-L6-v2 ~90 MB; set HF_HOME to relocate).
+# Expect roughly 1.5-2 GB extra RAM once both are loaded. Without these
+# dependencies the app still runs: AI Detection and Plagiarism fall back to
+# their built-in heuristics automatically.
 
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.2
 transformers>=4.44
+sentence-transformers>=3.0
 huggingface_hub>=0.23

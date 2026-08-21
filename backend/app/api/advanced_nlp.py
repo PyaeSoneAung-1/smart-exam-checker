@@ -77,6 +77,7 @@ def check_plagiarism(req: PlagiarismRequest, db: Session = Depends(get_db), curr
             "total_pairs": len(all_results),
             "flagged_pairs": len(flagged),
             "max_similarity": max([r.get("similarity", 0) for r in all_results], default=0),
+            "semantic_enabled": any(r.get("semantic_similarity") is not None for r in all_results),
         }
     }
 

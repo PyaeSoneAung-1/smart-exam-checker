@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     AI_MODEL: str = "distilgpt2"
     AI_MAX_TOKENS: int = 512
 
+    # Plagiarism detection: semantic (embedding) similarity layer; falls back
+    # to lexical-only automatically when the model is not installed
+    PLAGIARISM_EMBEDDINGS_ENABLED: bool = True
+
     # Scoring weights
     KEYWORD_WEIGHT: float = 0.30
     SIMILARITY_WEIGHT: float = 0.40
