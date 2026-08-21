@@ -252,7 +252,8 @@ model is not installed, so the app always runs. To enable real detection:
 
 ```bash
 cd backend
-pip install -r requirements-ai.txt      # torch (CPU) + transformers
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU torch (servers)
+pip install -r requirements-ai.txt
 ```
 
 On the first AI-detection request the model (**distilgpt2**, ~330 MB) downloads

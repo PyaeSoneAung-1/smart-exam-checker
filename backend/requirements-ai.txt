@@ -6,7 +6,14 @@
 #   * Plagiarism   → semantic similarity layer (all-MiniLM-L6-v2) that catches
 #                    paraphrased copies on top of the lexical TF-IDF matching
 #
+# On servers (no GPU) install torch CPU-FIRST, otherwise pip may pull the
+# huge CUDA build (~3 GB) from PyPI:
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cpu
 #     pip install -r requirements-ai.txt
+#
+# On desktops with a GPU you can skip the first line and just use the
+# default CUDA-enabled torch from PyPI.
 #
 # On first use the models download automatically to ~/.cache/huggingface
 # (distilgpt2 ~330 MB, all-MiniLM-L6-v2 ~90 MB; set HF_HOME to relocate).
@@ -14,7 +21,6 @@
 # dependencies the app still runs: AI Detection and Plagiarism fall back to
 # their built-in heuristics automatically.
 
---extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.2
 transformers>=4.44
 sentence-transformers>=3.0
