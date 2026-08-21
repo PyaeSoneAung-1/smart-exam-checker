@@ -24,7 +24,7 @@ interface ExamResult {
 export default function StudentResultsPage() {
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [passThreshold, setPassThreshold] = useState(40);
+  const [passThreshold] = useState(40);
 
   useEffect(() => {
     const fetchResults = async () => {

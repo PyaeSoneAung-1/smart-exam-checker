@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import api from "@/lib/api";
-import { examsApi } from "@/lib/api";
+import api, { examsApi, asApiError } from "@/lib/api";
+import type { Exam } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +86,7 @@ export default function TeacherAIDetectionPage() {
 /* ── Auto Scan Tab ───────────────────────────────────────── */
 
 function AutoScanTab() {
-  const [exams, setExams] = useState<any[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
   const [results, setResults] = useState<ScanResult[] | null>(null);
   const [summary, setSummary] = useState<ScanSummary | null>(null);
@@ -110,8 +110,8 @@ function AutoScanTab() {
       const total = res.data.summary?.total || 0;
       const ai = res.data.summary?.ai_detected || 0;
       toast.success(`Scan complete: ${total} students analyzed, ${ai} AI detected`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "AI scan failed");
+    } catch (err) {
+      toast.error(asApiError(err)?.response?.data?.detail || asApiError(err)?.message || "AI scan failed");
     } finally {
       setLoading(false);
     }
@@ -144,7 +144,7 @@ function AutoScanTab() {
                   <SelectValue placeholder="Select an exam..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {exams.map((exam: any) => (
+                  {exams.map((exam) => (
                     <SelectItem key={exam.id} value={String(exam.id)}>
                       {exam.title}
                     </SelectItem>
@@ -305,8 +305,8 @@ function SingleTextTab() {
     try {
       const res = await api.post("/nlp/ai-detection", { text: text.trim() });
       setResult(res.data);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Detection failed");
+    } catch (err) {
+      toast.error(asApiError(err)?.response?.data?.detail || asApiError(err)?.message || "Detection failed");
     } finally {
       setLoading(false);
     }
@@ -418,7 +418,7 @@ function SingleTextTab() {
                 <div className="flex flex-wrap gap-2">
                   {result.ai_phrases_found.map((phrase, i) => (
                     <Badge key={i} variant="outline" className="bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                      "{phrase}"
+                      &quot;{phrase}&quot;
                     </Badge>
                   ))}
                 </div>

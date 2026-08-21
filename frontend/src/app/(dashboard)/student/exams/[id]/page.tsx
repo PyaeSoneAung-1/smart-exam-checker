@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { examsApi, questionsApi, answersApi } from "@/lib/api";
-import type { Exam, Question } from "@/types";
+import { examsApi, questionsApi, answersApi, asApiError } from "@/lib/api";
+import type { Exam, Question, Answer } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,8 +23,8 @@ import {
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import {
-  Clock, Send, ArrowLeft, ArrowRight, CheckCircle, SkipForward,
-  CircleDot, Circle, ChevronLeft, ChevronRight,
+  Send, ArrowLeft, CheckCircle,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -46,7 +46,7 @@ function ExamContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Answer[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
@@ -103,7 +103,7 @@ function ExamContent() {
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      const allResults: any[] = [];
+      const allResults: Answer[] = [];
       for (const q of questions) {
         const res = await answersApi.submit({
           question_id: q.id,
@@ -114,8 +114,8 @@ function ExamContent() {
       setResults(allResults);
       setSubmitted(true);
       toast.success("Exam submitted successfully!");
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail || "Failed to submit exam";
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail || "Failed to submit exam";
       toast.error(typeof msg === "string" ? msg : "Already submitted or error occurred");
       submittedRef.current = false;
     } finally {
@@ -153,8 +153,8 @@ function ExamContent() {
 
   // Results view
   if (submitted && results.length > 0) {
-    const totalScore = results.reduce((sum: number, r: any) => sum + (r.score?.total_score || 0), 0);
-    const totalMarks = questions.reduce((sum: number, q: any) => sum + q.marks, 0);
+    const totalScore = results.reduce((sum: number, r: Answer) => sum + (r.score?.total_score || 0), 0);
+    const totalMarks = questions.reduce((sum: number, q: Question) => sum + q.marks, 0);
 
     return (
       <div className="max-w-3xl mx-auto space-y-6">
@@ -172,7 +172,7 @@ function ExamContent() {
           </CardContent>
         </Card>
 
-        {results.map((r: any, idx: number) => (
+        {results.map((r: Answer, idx: number) => (
           <Card key={idx}>
             <CardHeader>
               <CardTitle className="text-base">Q{idx + 1}: {questions[idx]?.question_text}</CardTitle>

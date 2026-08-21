@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { examsApi, questionsApi, answersApi, usersApi, settingsApi } from "@/lib/api";
+import { examsApi, questionsApi, answersApi, usersApi, settingsApi, asApiError } from "@/lib/api";
 import type { Exam, Answer } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,9 +157,10 @@ export default function AdminExamsPage() {
         } catch (e) {
           console.error('Failed to calculate overall stats', e);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error(err);
-        toast.error(typeof err?.message === "string" ? err.message : "Failed to load exams");
+        const message = asApiError(err)?.message;
+        toast.error(typeof message === "string" ? message : "Failed to load exams");
       } finally {
         setLoading(false);
       }

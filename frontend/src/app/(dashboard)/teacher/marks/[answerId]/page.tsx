@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import api, { answersApi, questionsApi } from "@/lib/api";
+import api, { answersApi, questionsApi, asApiError } from "@/lib/api";
 import type { Answer, Question } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,8 @@ export default function OverrideScorePage() {
     try {
       const res = await api.get(`/nlp/feedback/${answer.id}`);
       setFeedback(res.data.feedback || "No feedback generated");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Failed to generate feedback");
+    } catch (err) {
+      toast.error(asApiError(err)?.response?.data?.detail || asApiError(err)?.message || "Failed to generate feedback");
     } finally {
       setFeedbackLoading(false);
     }
@@ -101,8 +101,8 @@ export default function OverrideScorePage() {
       });
       toast.success(`Score overridden to ${score}/${maxMarks}`);
       router.push("/teacher/marks");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Failed to override score");
+    } catch (err) {
+      toast.error(asApiError(err)?.response?.data?.detail || asApiError(err)?.message || "Failed to override score");
     } finally {
       setIsSubmitting(false);
     }

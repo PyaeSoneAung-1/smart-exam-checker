@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { subjectsApi, teachersApi } from "@/lib/api";
+import { subjectsApi, teachersApi, asApiError } from "@/lib/api";
 import type { Subject, User } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -72,8 +72,8 @@ export default function AdminSubjectsPage() {
       setForm({ name: "", description: "", teacher_id: "" });
       setDialogOpen(false);
       fetchSubjects();
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create subject");
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create subject");
     }
   };
 
@@ -84,8 +84,8 @@ export default function AdminSubjectsPage() {
       toast.success("Subject deleted");
       setDeleteId(null);
       fetchSubjects();
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to delete subject");
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to delete subject");
     }
   };
 

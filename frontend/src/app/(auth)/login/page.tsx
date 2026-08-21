@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { asApiError } from "@/lib/api";
 import { Loader2, GraduationCap, Eye, EyeOff, AlertCircle, Mail, Lock } from "lucide-react";
 
 const container: Variants = {
@@ -45,9 +46,10 @@ export default function LoginPage() {
       const user = useAuthStore.getState().user;
       toast.success(`Welcome back, ${user?.name || ""}!`);
       router.push(`/${user?.role || "student"}`);
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      const message = detail || err?.message || "Login failed. Please try again.";
+    } catch (err) {
+      const apiError = asApiError(err);
+      const detail = apiError?.response?.data?.detail;
+      const message = detail || apiError?.message || "Login failed. Please try again.";
       setError(message);
       setEmail("");
       setPassword("");

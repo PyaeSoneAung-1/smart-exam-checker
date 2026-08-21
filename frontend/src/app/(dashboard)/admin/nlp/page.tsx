@@ -29,8 +29,13 @@ export default function AdminNLPPage() {
 
 /* ── System Status ─────────────────────────────────────────── */
 
+interface SystemHealth {
+  version: string;
+  anti_cheating_status: string;
+}
+
 function SystemStatus() {
-  const [health, setHealth] = useState<any>(null);
+  const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

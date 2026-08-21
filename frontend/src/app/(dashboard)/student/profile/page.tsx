@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials, getRoleColor, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
-import api from "@/lib/api";
+import api, { asApiError } from "@/lib/api";
 
 export default function StudentProfilePage() {
   const { user, fetchUser } = useAuthStore();
@@ -41,8 +41,9 @@ export default function StudentProfilePage() {
         toast.info("Name/email updates require admin assistance");
       }
       await fetchUser();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Update failed");
+    } catch (err) {
+      const apiError = asApiError(err);
+      toast.error(apiError?.response?.data?.detail || apiError?.message || "Update failed");
     } finally {
       setIsLoading(false);
     }

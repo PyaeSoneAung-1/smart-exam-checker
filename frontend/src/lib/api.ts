@@ -1,9 +1,19 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, LoginRequest, RegisterRequest, User,
-  Subject, Exam, Question, Answer, ExamSubmission, ScoreOverride,
+  Subject, Exam, Question, Answer, ScoreOverride,
   StudentDashboard, TeacherDashboard, AdminDashboard,
 } from '@/types';
+
+/** Minimal shape of an API error (axios error with a FastAPI-style detail). */
+export interface ApiErrorShape {
+  response?: { data?: { detail?: string } };
+  message?: string;
+}
+
+export function asApiError(err: unknown): ApiErrorShape {
+  return err as ApiErrorShape;
+}
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -67,7 +77,7 @@ export const usersApi = {
   bulkImport: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return api.post<{ created: number; skipped: number; errors: string[]; users: any[] }>('/users/bulk-import', formData, {
+    return api.post<{ created: number; skipped: number; errors: string[]; users: User[] }>('/users/bulk-import', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },

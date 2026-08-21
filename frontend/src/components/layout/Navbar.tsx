@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import type { User as UserType } from "@/types";
 import { getInitials, getRoleColor } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -67,7 +68,7 @@ function MobileMenu({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
+  user: UserType | null;
   onLogout: () => void;
 }) {
   if (!isOpen) return null;

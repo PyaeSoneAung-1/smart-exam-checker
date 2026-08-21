@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usersApi } from "@/lib/api";
-import type { User, UserRole } from "@/types";
+import { usersApi, asApiError } from "@/lib/api";
+import type { User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,8 +71,8 @@ export default function AdminUsersPage() {
       setForm({ name: "", email: "", password: "", role: "student" });
       setDialogOpen(false);
       fetchUsers();
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create user");
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create user");
     }
   };
 
@@ -86,7 +86,7 @@ export default function AdminUsersPage() {
         toast.success(`${user.name} activated`);
       }
       fetchUsers();
-    } catch (err) {
+    } catch {
       toast.error("Failed to update user");
     }
   };
@@ -97,7 +97,7 @@ export default function AdminUsersPage() {
       await usersApi.delete(user.id);
       toast.success(`${user.name} deleted`);
       fetchUsers();
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete user");
     }
   };

@@ -24,7 +24,7 @@ export default function DashLayout({ children }: { children: React.ReactNode }) 
     }
     // Fetch user but don't block rendering on failure
     fetchUser().finally(() => setReady(true));
-  }, [_hydrated, token]); // Only run on hydration/token change
+  }, [_hydrated, token, user, router, fetchUser]); // Only run on hydration/token/user change
 
   // Role guard — only redirect when we have a confirmed user
   useEffect(() => {

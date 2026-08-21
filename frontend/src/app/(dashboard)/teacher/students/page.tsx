@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usersApi, answersApi, examsApi, subjectsApi } from "@/lib/api";
-import { useAuthStore } from "@/store/authStore";
+import { usersApi, answersApi } from "@/lib/api";
 import type { User, Answer } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Users, Search, Mail, Trophy, Award } from "lucide-react";
+import { Users, Search, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 interface StudentWithScore {
@@ -23,8 +22,6 @@ export default function TeacherStudentsPage() {
   const [students, setStudents] = useState<StudentWithScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-
-  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     const fetchStudents = async () => {

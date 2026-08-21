@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { dashboardApi, settingsApi } from "@/lib/api";
+import type { AdminDashboard } from "@/types";
 import { toast } from "sonner";
 import {
   Settings, Server, Users, BookOpen, FileText, Activity,
-  Save, Loader2, RotateCcw, Shield, Scale, AlertTriangle, RefreshCw,
+  Save, Loader2, RotateCcw, Shield, Scale, AlertTriangle,
 } from "lucide-react";
 
 interface ScoringWeights {
@@ -31,7 +32,7 @@ const DEFAULT_WEIGHTS: ScoringWeights = { keyword: 30, semantic: 25, grammar: 15
 const DEFAULT_THRESHOLDS: Thresholds = { plagiarism: 60, low_score: 30, pass_percentage: 40 };
 
 export default function AdminSettingsPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [weights, setWeights] = useState<ScoringWeights>(DEFAULT_WEIGHTS);
   const [thresholds, setThresholds] = useState<Thresholds>(DEFAULT_THRESHOLDS);

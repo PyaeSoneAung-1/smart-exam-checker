@@ -31,7 +31,7 @@ export default function PassRate({ passRate }: PassRateProps) {
           ))}
         </Pie>
         <Tooltip
-          formatter={(value: any) => `${Number(value).toFixed(1)}%`}
+          formatter={(value) => `${Number(value).toFixed(1)}%`}
           contentStyle={{
             backgroundColor: "hsl(var(--card))",
             border: "1px solid hsl(var(--border))",

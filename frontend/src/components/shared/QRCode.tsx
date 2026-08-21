@@ -39,7 +39,7 @@ export default function QRCode({ value, size = 200, className }: QRCodeProps) {
     }
 
     const seededRandom = (seed: number) => {
-      let x = Math.sin(seed) * 10000;
+      const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
     };
 

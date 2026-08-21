@@ -11,7 +11,6 @@ interface ScoreBadgeProps {
 
 export default function ScoreBadge({ score, max, className }: ScoreBadgeProps) {
   const pct = max > 0 ? (score / max) * 100 : 0;
-  let variant: "default" | "secondary" | "destructive" | "outline" = "default";
   let colorClass = "";
 
   if (pct >= 80) {

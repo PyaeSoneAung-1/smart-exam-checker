@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { questionsApi } from "@/lib/api";
+import { questionsApi, asApiError } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,8 +37,8 @@ export default function CreateQuestionPage() {
       });
       toast.success("Question created!");
       router.push(`/teacher/exams/${id}`);
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create question");
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create question");
     } finally {
       setSaving(false);
     }

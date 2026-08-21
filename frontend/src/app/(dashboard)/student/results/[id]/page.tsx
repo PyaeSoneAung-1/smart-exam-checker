@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { answersApi, questionsApi } from "@/lib/api";
-import type { Answer, Question } from "@/types";
+import { answersApi } from "@/lib/api";
+import type { Answer } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function StudentResultDetailPage() {
   const { id } = useParams();

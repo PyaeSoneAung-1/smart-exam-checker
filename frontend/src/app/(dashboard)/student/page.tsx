@@ -37,7 +37,7 @@ export default function StudentDashboardPage() {
           const answers: Answer[] = answerRes.data.items || [];
           const questions = qRes.data.items || [];
           const questionToExam: Record<number, number> = {};
-          questions.forEach((q: any) => { questionToExam[q.id] = q.exam_id; });
+          questions.forEach((q) => { questionToExam[q.id] = q.exam_id; });
           const completed = new Set<number>();
           for (const answer of answers) {
             const examId = questionToExam[answer.question_id];
@@ -138,7 +138,7 @@ export default function StudentDashboardPage() {
         <MotionCard delay={0.1}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" /> Available Exams</CardTitle>
-            <CardDescription>Exams you haven't taken yet</CardDescription>
+            <CardDescription>Exams you haven&apos;t taken yet</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {availableExams.length > 0 ? (

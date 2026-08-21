@@ -30,7 +30,7 @@ export default function StudentExamsPage() {
           const qRes = await questionsApi.getAll({ limit: 500 });
           const questions = qRes.data.items || [];
           const questionToExam: Record<number, number> = {};
-          questions.forEach((q: any) => { questionToExam[q.id] = q.exam_id; });
+          questions.forEach((q) => { questionToExam[q.id] = q.exam_id; });
 
           const completedIds = new Set<number>();
           let totalScore = 0;

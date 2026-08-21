@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import api from "@/lib/api";
-import { examsApi } from "@/lib/api";
-import { usersApi } from "@/lib/api";
+import api, { examsApi, usersApi, asApiError } from "@/lib/api";
+import type { Exam, User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +10,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Scale, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
+interface PlagiarismPair {
+  similarity: number;
+  flagged: boolean;
+  question_text?: string;
+  [key: string]: unknown;
+}
+
+interface PlagiarismResult {
+  pairs: PlagiarismPair[];
+  summary?: { total_pairs: number; flagged_pairs: number; max_similarity: number };
+}
+
 export default function TeacherPlagiarismPage() {
-  const [exams, setExams] = useState<any[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExam, setSelectedExam] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<PlagiarismResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<User[]>([]);
 
   useEffect(() => {
     examsApi.getAll({ limit: 100 }).then((res) => {
@@ -34,8 +45,8 @@ export default function TeacherPlagiarismPage() {
       const res = await api.post("/nlp/plagiarism-check", { exam_id: parseInt(selectedExam) });
       setResult(res.data);
       toast.success("Plagiarism check complete");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.message || "Plagiarism check failed");
+    } catch (err) {
+      toast.error(asApiError(err)?.response?.data?.detail || asApiError(err)?.message || "Plagiarism check failed");
     } finally {
       setLoading(false);
     }
@@ -47,9 +58,9 @@ export default function TeacherPlagiarismPage() {
 
   // Use backend summary (respects DB plagiarism threshold)
   const totalPairs = result?.summary?.total_pairs ?? pairs.length;
-  const flaggedPairs = result?.summary?.flagged_pairs ?? pairs.filter((p: any) => p.flagged === true).length;
+  const flaggedPairs = result?.summary?.flagged_pairs ?? pairs.filter((p) => p.flagged === true).length;
   const maxSimilarity = result?.summary?.max_similarity ?? (totalPairs > 0
-    ? Math.max(...pairs.map((p: any) => p.similarity || 0))
+    ? Math.max(...pairs.map((p) => p.similarity || 0))
     : 0);
 
   const getSimilarityColor = (sim: number) => {
@@ -58,9 +69,10 @@ export default function TeacherPlagiarismPage() {
     return "bg-green-100 text-green-700";
   };
 
-  const getStudentName = (pair: any, key: string) => {
+  const getStudentName = (pair: PlagiarismPair, key: string) => {
     const id = pair[key] || pair[`${key}_id`] || pair[key.replace('_', '')] || pair[key.replace('_', '1')];
-    return nameMap[id] || id || "Student ?";
+    if (!id) return "Student ?";
+    return nameMap[Number(id)] || String(id);
   };
 
   return (
@@ -85,7 +97,7 @@ export default function TeacherPlagiarismPage() {
                   <SelectValue placeholder="Select an exam..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {exams.map((exam: any) => (
+                  {exams.map((exam) => (
                     <SelectItem key={exam.id} value={String(exam.id)}>
                       {exam.title}
                     </SelectItem>
@@ -154,7 +166,7 @@ export default function TeacherPlagiarismPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pairs.map((pair: any, i: number) => (
+                  {pairs.map((pair, i: number) => (
                     <div
                       key={i}
                       className="flex items-center gap-3 p-4 rounded-lg border bg-background text-sm"

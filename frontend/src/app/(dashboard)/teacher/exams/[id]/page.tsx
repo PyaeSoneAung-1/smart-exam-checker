@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { examsApi, questionsApi } from "@/lib/api";
@@ -18,7 +18,7 @@ export default function TeacherExamDetailPage() {
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [examRes, qRes] = await Promise.all([
         examsApi.getById(Number(id)),
@@ -32,9 +32,9 @@ export default function TeacherExamDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  useEffect(() => { fetchData(); }, [id]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleDeleteQuestion = async (q: Question) => {
     if (!confirm("Delete this question?")) return;
@@ -42,7 +42,7 @@ export default function TeacherExamDetailPage() {
       await questionsApi.delete(q.id);
       toast.success("Question deleted");
       fetchData();
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete question");
     }
   };

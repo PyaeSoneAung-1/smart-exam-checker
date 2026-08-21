@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 
 interface UseWebSocketOptions {
   url: string;
-  onMessage?: (data: any) => void;
+  onMessage?: (data: unknown) => void;
   onOpen?: () => void;
   onClose?: () => void;
   onError?: (error: Event) => void;
@@ -82,7 +82,7 @@ export function useWebSocket({
     setStatus("disconnected");
   }, [maxReconnectAttempts]);
 
-  const send = useCallback((data: any) => {
+  const send = useCallback((data: unknown) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(typeof data === "string" ? data : JSON.stringify(data));
     }

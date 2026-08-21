@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { examsApi, subjectsApi } from "@/lib/api";
+import { examsApi, subjectsApi, asApiError } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import type { Exam, Subject } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,7 @@ export default function TeacherExamsPage() {
 
   const user = useAuthStore((s) => s.user);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [examRes, subRes] = await Promise.all([
         examsApi.getAll({ limit: 500 }),
@@ -50,9 +50,9 @@ export default function TeacherExamsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = async () => {
     if (!form.title || !form.subject_id) {
@@ -71,8 +71,8 @@ export default function TeacherExamsPage() {
       setForm({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30" });
       setDialogOpen(false);
       fetchData();
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create exam");
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail; toast.error(typeof msg === "string" ? msg : "Failed to create exam");
     }
   };
 
@@ -82,7 +82,7 @@ export default function TeacherExamsPage() {
       await examsApi.delete(exam.id);
       toast.success("Exam deleted");
       fetchData();
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete exam");
     }
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { subjectsApi, examsApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
@@ -20,7 +20,7 @@ export default function TeacherSubjectsPage() {
 
   const user = useAuthStore((s) => s.user);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [subRes, examRes] = await Promise.all([
         subjectsApi.getAll({ limit: 500 }),
@@ -47,9 +47,9 @@ export default function TeacherSubjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = subjects.filter((s) =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) ||

@@ -17,13 +17,13 @@ import { examsApi, exportApi } from "@/lib/api";
 import type { Exam } from "@/types";
 import ExportButton from "@/components/shared/ExportButton";
 import { toast } from "sonner";
-import { FileText, Table, Download, Eye, Loader2 } from "lucide-react";
+import { FileText, Table, Eye, Loader2 } from "lucide-react";
 
 export default function TeacherExportPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [preview, setPreview] = useState<any[] | null>(null);
+  const [preview, setPreview] = useState<Record<string, unknown>[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {

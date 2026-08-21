@@ -39,7 +39,7 @@ export function ChartFrame({
       style={{ width: "100%", height }}
     >
       <ResponsiveContainer width="100%" height="100%">
-        {children as any}
+        {children as React.ReactElement}
       </ResponsiveContainer>
     </motion.div>
   );
@@ -88,7 +88,7 @@ export function AnimatedBarChart({
         <Tooltip
           cursor={{ fill: c.muted || "rgba(0,0,0,0.04)" }}
           contentStyle={tooltipStyle(c)}
-          formatter={(v: any) => [`${Number(v).toFixed(1)}${unit}`, "Value"]}
+          formatter={(v) => [`${Number(v).toFixed(1)}${unit}`, "Value"]}
         />
         <Bar dataKey={dataKey} radius={horizontal ? [0, 8, 8, 0] : [8, 8, 0, 0]} isAnimationActive animationDuration={900}>
           {data.map((_, i) => (
@@ -136,7 +136,7 @@ export function AnimatedDonut({
             <Cell key={i} fill={colors[i % colors.length] || c.chart1} />
           ))}
         </Pie>
-        <Tooltip contentStyle={tooltipStyle(c)} formatter={(v: any, n: any) => [`${Number(v).toFixed(1)}${unit}`, n]} />
+        <Tooltip contentStyle={tooltipStyle(c)} formatter={(v, n) => [`${Number(v).toFixed(1)}${unit}`, n]} />
       </PieChart>
     </ChartFrame>
   );
@@ -174,7 +174,7 @@ export function AnimatedAreaChart({
         <CartesianGrid strokeDasharray="3 3" stroke={c.border || "#eee"} vertical={false} />
         <XAxis dataKey={xKey} tick={axisTickStyle(c)} axisLine={false} tickLine={false} minTickGap={12} />
         <YAxis tick={axisTickStyle(c)} axisLine={false} tickLine={false} width={36} />
-        <Tooltip contentStyle={tooltipStyle(c)} formatter={(v: any) => [`${Number(v).toFixed(1)}${unit}`, "Score"]} />
+        <Tooltip contentStyle={tooltipStyle(c)} formatter={(v) => [`${Number(v).toFixed(1)}${unit}`, "Score"]} />
         <Area
           type="monotone"
           dataKey={dataKey}
