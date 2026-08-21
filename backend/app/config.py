@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     LANGUAGE_TOOL_URL: Optional[str] = None
     LANGUAGE_TOOL_LANGUAGE: str = "en-US"
 
+    # AI detection (real language-model based; falls back to heuristics
+    # automatically when the model is not installed)
+    AI_LM_ENABLED: bool = True
+    AI_MODEL: str = "distilgpt2"
+    AI_MAX_TOKENS: int = 512
+
     # Scoring weights
     KEYWORD_WEIGHT: float = 0.30
     SIMILARITY_WEIGHT: float = 0.40

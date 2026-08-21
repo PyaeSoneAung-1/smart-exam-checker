@@ -7,7 +7,7 @@ module.exports = {
       args: '-m uvicorn app.main:app --host 127.0.0.1 --port 8090 --workers 1',
       interpreter: 'none',
       autorestart: true,
-      max_memory_restart: '800M',
+      max_memory_restart: '2048M',  # raised for torch AI-detection model (distilgpt2); 800M would restart the process once the model loads
       env: {
         NODE_ENV: 'production',
       },

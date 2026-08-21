@@ -231,3 +231,46 @@ answers — passwords are all `123456`).
 > If you ever want the backend on a cloud too, it can be containerized with the
 > included `backend/Dockerfile` and run on Railway / Render / Fly.io with a
 > PostgreSQL `DATABASE_URL`.
+
+---
+
+## 10. AI Detection — real language-model mode
+
+The **Teacher → AI Detection** feature detects AI-generated answers with a
+GPTZero-style approach:
+
+- **Perplexity (PPL)** — average negative log-likelihood of the answer under a
+  causal language model. AI-written text is statistically predictable → low PPL.
+- **Burstiness** — variation of sentence-level perplexity. AI text is unusually
+  uniform; human writing varies from sentence to sentence.
+- Small bonus for classic ChatGPT phrasing ("delve into", "moreover", …).
+
+### Enable it
+
+The detector **falls back to phrase heuristics automatically** if the language
+model is not installed, so the app always runs. To enable real detection:
+
+```bash
+cd backend
+pip install -r requirements-ai.txt      # torch (CPU) + transformers
+```
+
+On the first AI-detection request the model (**distilgpt2**, ~330 MB) downloads
+automatically to `~/.cache/huggingface` (set `HF_HOME` to relocate it). Expect
+roughly **1 GB extra RAM** once loaded — if you use the included PM2 config,
+the backend entry already uses `max_memory_restart: 2048M`.
+
+Optional settings (`.env`):
+
+```
+AI_LM_ENABLED=true
+AI_MODEL=distilgpt2        # or gpt2 for higher accuracy at ~4x the size
+AI_MAX_TOKENS=512
+```
+
+### Known limitations
+
+- Very regular classic prose (e.g. Dickens) and extremely uniform formal text
+  can score as AI-like — this is inherent to perplexity-based detectors.
+- Short answers (< ~20 characters) are never flagged.
+- Detection is statistical, not proof: treat results as a signal for manual review.

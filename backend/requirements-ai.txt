@@ -1,0 +1,17 @@
+# Optional dependencies for REAL AI-generated-text detection.
+#
+# Install only if you want the AI Detection feature to use an actual
+# language model (GPTZero-style perplexity + burstiness) instead of the
+# built-in phrase heuristics:
+#
+#     pip install -r requirements-ai.txt
+#
+# On first AI-detection request the model (distilgpt2, ~330 MB) is downloaded
+# automatically to ~/.cache/huggingface (set HF_HOME to relocate it).
+# Requires roughly 1 GB free RAM once loaded. The API falls back to
+# heuristics automatically when these are missing, so the app still runs.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+transformers>=4.44
+huggingface_hub>=0.23
