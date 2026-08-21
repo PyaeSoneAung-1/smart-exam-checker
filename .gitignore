@@ -1,0 +1,25 @@
+# ── Secrets & local env ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Backend (Python) ───────────────────────────────────────────────
+backend/venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+backend/smart_exam.db
+backend/uploads/
+
+# ── Frontend (Node) ────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+
+# ── Vercel / misc ──────────────────────────────────────────────────
+.vercel
+.DS_Store
+*.log

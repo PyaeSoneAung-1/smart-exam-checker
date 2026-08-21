@@ -1,0 +1,16 @@
+# Local env (never commit real secrets)
+.env
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Runtime data
+smart_exam.db
+uploads/
+
+# Logs
+*.log

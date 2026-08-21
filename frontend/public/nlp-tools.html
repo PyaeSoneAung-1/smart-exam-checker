@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NLP Tools — Smart Exam Checker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;min-height:100vh}
+.container{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+.subtitle{color:#64748b;margin-bottom:24px}
+.tabs{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:10px 20px;border:none;background:#e2e8f0;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s}
+.tab.active{background:#fff;color:#7c3aed;box-shadow:0 -2px 8px rgba(0,0,0,.05)}
+.tab:hover:not(.active){background:#cbd5e1}
+.panel{display:none;background:#fff;border-radius:0 12px 12px 12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.panel.active{display:block}
+label{display:block;font-weight:600;margin-bottom:6px;font-size:14px}
+textarea,select,input[type=number]{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;margin-bottom:12px}
+textarea:focus,select:focus,input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+.btn{padding:10px 24px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn:hover{background:#6d28d9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:6px 12px;font-size:12px}
+.result{margin-top:16px;padding:16px;background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow-y:auto}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:12px}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-purple{background:#ede9fe;color:#7c3aed}
+.badge-green{background:#dcfce7;color:#16a34a}
+.badge-orange{background:#fff7ed;color:#ea580c}
+.badge-red{background:#fef2f2;color:#dc2626}
+.badge-blue{background:#dbeafe;color:#2563eb}
+.error{color:#dc2626;font-size:13px;margin-top:-8px;margin-bottom:8px}
+.loading{text-align:center;padding:40px;color:#64748b}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e2e8f0;border-top-color:#7c3aed;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.back-link{color:#7c3aed;text-decoration:none;font-size:14px;font-weight:500}
+.back-link:hover{text-decoration:underline}
+nav{margin-bottom:16px;font-size:13px;color:#94a3b8}
+nav a{color:#7c3aed;text-decoration:none}
+nav a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<script>if(!(function(){try{var s=localStorage.getItem('auth-storage');return s&&JSON.parse(s)?.state?.token}catch(e){return false}})()){window.location.href='/login'}</script>
+<div class="container">
+  <h1>🧠 NLP Tools</h1>
+  <p class="subtitle">AI-powered text analysis, question generation, difficulty assessment, and topic extraction.</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('summarize')">📝 Summarize</button>
+    <button class="tab" onclick="switchTab('questions')">❓ Generate Questions</button>
+    <button class="tab" onclick="switchTab('difficulty')">📊 Difficulty</button>
+    <button class="tab" onclick="switchTab('topics')">🏷️ Extract Topics</button>
+    <button class="tab" onclick="switchTab('compare')">🔄 Compare Texts</button>
+  </div>
+
+  <!-- Summarize -->
+  <div id="panel-summarize" class="panel active">
+    <label>Input Text</label>
+    <textarea id="sum-text" rows="6" placeholder="Paste long text to summarize...">Artificial intelligence is transforming education. Machine learning algorithms can analyze student performance and provide personalized learning paths. Deep learning models excel at natural language processing tasks like text classification and sentiment analysis. However, ethical concerns about data privacy and algorithmic bias must be addressed. Teachers play a crucial role in guiding students through AI-enhanced learning experiences. The integration of AI in classrooms requires careful planning and professional development for educators.</textarea>
+    <div class="row">
+      <div><label>Sentences</label><input id="sum-sentences" type="number" value="3" min="1" max="10"></div>
+      <div style="align-self:flex-end"><button class="btn" onclick="summarize()">Summarize</button></div>
+    </div>
+    <div id="sum-result" class="result" style="display:none"></div>
+  </div>
+
+  <!-- Generate Questions -->
+  <div id="panel-questions" class="panel">
+    <label>Source Text</label>
+    <textarea id="q-text" rows="6" placeholder="Paste text to generate questions from...">Artificial intelligence is transforming education. Machine learning algorithms can analyze student performance and provide personalized learning paths. Deep learning models excel at natural language processing tasks like text classification and sentiment analysis. Teachers play a crucial role in guiding students through AI-enhanced learning experiences.</textarea>
+    <div class="row">
+      <div><label># Questions</label><input id="q-count" type="number" value="3" min="1" max="10"></div>
+      <div><label>Types</label>
+        <select id="q-types" multiple style="height:80px">
+          <option value="definition" selected>Definition</option>
+          <option value="concept" selected>Concept</option>
+          <option value="application" selected>Application</option>
+          <option value="analysis">Analysis</option>
+        </select>
+      </div>
+      <div style="align-self:flex-end"><button class="btn" onclick="generateQuestions()">Generate</button></div>
+    </div>
+    <div id="q-result" class="result" style="display:none"></div>
+  </div>
+
+  <!-- Difficulty -->
+  <div id="panel-difficulty" class="panel">
+    <label>Question Text</label>
+    <textarea id="d-text" rows="3" placeholder="Enter a question to assess difficulty...">Evaluate the ethical implications of using artificial intelligence in education and propose a framework for responsible implementation.</textarea>
+    <div class="row">
+      <div><label>Marks (optional)</label><input id="d-marks" type="number" value="20" min="1" max="100"></div>
+      <div><label>Model Answer (optional)</label><input id="d-answer" type="text" placeholder="Expected answer..."></div>
+      <div style="align-self:flex-end"><button class="btn" onclick="assessDifficulty()">Assess</button></div>
+    </div>
+    <div id="d-result" class="result" style="display:none"></div>
+  </div>
+
+  <!-- Topics -->
+  <div id="panel-topics" class="panel">
+    <label>Input Text</label>
+    <textarea id="t-text" rows="6" placeholder="Paste text to extract topics...">Artificial intelligence is transforming education. Machine learning algorithms can analyze student performance and provide personalized learning paths. Deep learning models excel at natural language processing tasks like text classification and sentiment analysis. However, ethical concerns about data privacy and algorithmic bias must be addressed. Teachers play a crucial role in guiding students through AI-enhanced learning experiences. The integration of AI in classrooms requires careful planning and professional development for educators.</textarea>
+    <div class="row">
+      <div><label>Max Topics</label><input id="t-count" type="number" value="5" min="1" max="10"></div>
+      <div style="align-self:flex-end"><button class="btn" onclick="extractTopics()">Extract</button></div>
+    </div>
+    <div id="t-result" class="result" style="display:none"></div>
+  </div>
+
+  <!-- Compare -->
+  <div id="panel-compare" class="panel">
+    <label>Text 1</label>
+    <textarea id="c-text1" rows="4" placeholder="First text...">Artificial intelligence is transforming education through personalized learning paths and automated assessment systems.</textarea>
+    <label>Text 2</label>
+    <textarea id="c-text2" rows="4" placeholder="Second text...">Machine learning algorithms enable personalized education by analyzing student performance data and adapting content delivery.</textarea>
+    <div style="display:flex;justify-content:flex-end"><button class="btn" onclick="compareTexts()">Compare</button></div>
+    <div id="c-result" class="result" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://exam.hiroshi.cloud/api';
+let TOKEN = '';
+
+// Get token from localStorage (Zustand format)
+function getToken() {
+  try {
+    const stored = localStorage.getItem('auth-storage');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed?.state?.token || '';
+    }
+  } catch(e) {}
+  return '';
+}
+
+async function apiCall(path, method, body) {
+  if (!TOKEN) TOKEN = getToken();
+  if (!TOKEN) return { error: 'Please login first. <a href="/login">Go to login</a>' };
+  
+  try {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const resp = await fetch(API + path, opts);
+    const data = await resp.json();
+    if (!resp.ok) return { error: data.detail || `HTTP ${resp.status}` };
+    return data;
+  } catch(e) {
+    return { error: 'Network error: ' + e.message };
+  }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function showLoading(id) { document.getElementById(id).style.display='block';document.getElementById(id).innerHTML='<div class="loading"><div class="spinner"></div><p>Processing...</p></div>'; }
+function showResult(id, html) { document.getElementById(id).style.display='block';document.getElementById(id).innerHTML=html; }
+
+// Summarize
+async function summarize() {
+  showLoading('sum-result');
+  const data = await apiCall('/nlp/summarize', 'POST', {
+    text: document.getElementById('sum-text').value,
+    num_sentences: parseInt(document.getElementById('sum-sentences').value)
+  });
+  if (data.error) { showResult('sum-result', `<span class="error">❌ ${data.error}</span>`); return; }
+  showResult('sum-result', `
+    <p style="font-size:16px;margin-bottom:12px"><strong>Summary:</strong> ${data.summary}</p>
+    <div style="display:flex;gap:12px;font-size:13px;color:#64748b">
+      <span>📄 ${data.original_sentences} → ${data.summary_sentences} sentences (${Math.round(data.compression_ratio*100)}%)</span>
+    </div>
+  `);
+}
+
+// Generate Questions
+async function generateQuestions() {
+  showLoading('q-result');
+  const sel = document.getElementById('q-types');
+  const types = Array.from(sel.selectedOptions).map(o => o.value);
+  const data = await apiCall('/nlp/generate-questions', 'POST', {
+    text: document.getElementById('q-text').value,
+    num_questions: parseInt(document.getElementById('q-count').value),
+    question_types: types.length ? types : undefined
+  });
+  if (data.error) { showResult('q-result', `<span class="error">❌ ${data.error}</span>`); return; }
+  let html = '<p style="margin-bottom:12px"><strong>Keywords:</strong> ' + (data.source_keywords||[]).map(function(k){return '<span class="badge badge-purple">'+k+'</span>';}).join(' ') + '</p>';
+  (data.questions||[]).forEach(q => {
+    html += `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
+        <strong>Q${q.id}.</strong>
+        <span class="badge badge-green">${q.type}</span>
+      </div>
+      <p style="margin-bottom:8px">${q.question}</p>
+      ${q.source_context ? `<p style="font-size:12px;color:#94a3b8">📎 ${q.source_context.substring(0,120)}...</p>` : ''}
+    </div>`;
+  });
+  showResult('q-result', html);
+}
+
+// Assess Difficulty
+async function assessDifficulty() {
+  showLoading('d-result');
+  const body = { question_text: document.getElementById('d-text').value };
+  const marks = document.getElementById('d-marks').value;
+  const answer = document.getElementById('d-answer').value;
+  if (marks) body.marks = parseInt(marks);
+  if (answer) body.model_answer = answer;
+  const data = await apiCall('/nlp/assess-difficulty', 'POST', body);
+  if (data.error) { showResult('d-result', `<span class="error">❌ ${data.error}</span>`); return; }
+  
+  const colors = { 'Very Easy':'badge-green','Easy':'badge-green','Moderate':'badge-blue','Challenging':'badge-orange','Hard':'badge-red','Very Hard':'badge-red' };
+  const color = colors[data.difficulty_label] || 'badge-purple';
+  
+  showResult('d-result', `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+      <div><strong>Score:</strong> <span style="font-size:24px;font-weight:700;color:#7c3aed">${data.difficulty_score}/10</span></div>
+      <div><strong>Label:</strong> <span class="badge ${color}">${data.difficulty_label}</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;font-size:13px">
+      <div class="card"><strong>Bloom's Level:</strong> ${data.blooms_taxonomy_level}</div>
+      <div class="card"><strong>Verb:</strong> ${data.blooms_verb_detected||'N/A'}</div>
+      <div class="card"><strong>Readability:</strong> Grade ${data.readability?.grade_level||'?'}</div>
+      <div class="card"><strong>Words:</strong> ${data.readability?.word_count||'?'}</div>
+    </div>
+  `);
+}
+
+// Extract Topics
+async function extractTopics() {
+  showLoading('t-result');
+  const data = await apiCall('/nlp/extract-topics', 'POST', {
+    text: document.getElementById('t-text').value,
+    max_topics: parseInt(document.getElementById('t-count').value)
+  });
+  if (data.error) { showResult('t-result', `<span class="error">❌ ${data.error}</span>`); return; }
+  let html = `<p style="margin-bottom:12px"><strong>Summary:</strong> ${data.summary||''}</p>`;
+  (data.topics||[]).forEach(t => {
+    html += `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong>${t.label}</strong>
+        <span class="badge badge-purple">${Math.round(t.relevance*100)}%</span>
+      </div>
+      <div>' + (t.keywords||[]).map(function(k){return '<span class="badge badge-blue" style="margin:2px">'+k+'</span>';}).join(' ') + '</div>
+    </div>`;
+  });
+  html += `<div style="display:flex;gap:12px;margin-top:8px;font-size:13px;color:#64748b">
+    <span>📊 Words: ${data.summary_stats?.total_words||0}</span>
+    <span>🔤 Unique: ${data.summary_stats?.unique_words||0}</span>
+    <span>📐 Diversity: ${data.summary_stats?.lexical_diversity||0}</span>
+  </div>`;
+  showResult('t-result', html);
+}
+
+// Compare Texts
+async function compareTexts() {
+  showLoading('c-result');
+  const data = await apiCall('/nlp/compare-texts', 'POST', {
+    text1: document.getElementById('c-text1').value,
+    text2: document.getElementById('c-text2').value
+  });
+  if (data.error) { showResult('c-result', `<span class="error">❌ ${data.error}</span>`); return; }
+  showResult('c-result', `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:12px">
+      <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:#7c3aed">${Math.round(data.similarity*100)}%</div><div style="font-size:12px;color:#64748b">Similarity</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:#16a34a">${data.common_topics}</div><div style="font-size:12px;color:#64748b">Common Topics</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:#ea580c">${data.text1_unique_topics}</div><div style="font-size:12px;color:#64748b">Text 1 Unique</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:28px;font-weight:700;color:#dc2626">${data.text2_unique_topics}</div><div style="font-size:12px;color:#64748b">Text 2 Unique</div></div>
+    </div>
+  `);
+}
+
+// Init
+TOKEN = getToken();
+</script>
+</body>
+</html>
