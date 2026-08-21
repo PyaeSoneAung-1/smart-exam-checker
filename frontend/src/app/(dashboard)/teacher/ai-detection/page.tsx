@@ -317,6 +317,12 @@ function SingleTextTab() {
     return "text-green-600";
   };
 
+  // Backend returns ai_probability as 0-1; convert to 0-100 for display.
+  // (defensive: if a backend ever sends 0-100 already, pass it through)
+  const aiPercent = result
+    ? Math.max(0, Math.min(100, result.ai_probability > 1 ? result.ai_probability : result.ai_probability * 100))
+    : 0;
+
   return (
     <div className="space-y-4">
       <Card>
@@ -355,16 +361,16 @@ function SingleTextTab() {
                   <path
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                     fill="none" stroke="currentColor"
-                    className={result.ai_probability >= 45 ? "text-red-500" : result.ai_probability >= 25 ? "text-yellow-500" : "text-green-500"}
-                    strokeWidth="3" strokeDasharray={`${result.ai_probability}, 100`}
+                    className={aiPercent >= 45 ? "text-red-500" : aiPercent >= 25 ? "text-yellow-500" : "text-green-500"}
+                    strokeWidth="3" strokeDasharray={`${aiPercent}, 100`}
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold">{result.ai_probability}%</span>
+                  <span className="text-xl font-bold">{aiPercent.toFixed(1)}%</span>
                 </div>
               </div>
-              <p className={`text-lg font-bold ${getVerdictColor(result.ai_probability)}`}>
-                {getVerdict(result.ai_probability)}
+              <p className={`text-lg font-bold ${getVerdictColor(aiPercent)}`}>
+                {getVerdict(aiPercent)}
               </p>
             </CardContent>
           </Card>
