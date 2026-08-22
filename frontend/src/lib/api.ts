@@ -149,6 +149,8 @@ export const exportApi = {
     api.get(`/export/results/${examId}`, { responseType: 'blob' }),
   exportResultsXlsx: (examId: number) =>
     api.get(`/export/results/${examId}/xlsx`, { responseType: 'blob' }),
+  exportResultsPdf: (examId: number) =>
+    api.get(`/export/results/${examId}/pdf`, { responseType: 'blob' }),
 };
 
 // ---- Settings ----

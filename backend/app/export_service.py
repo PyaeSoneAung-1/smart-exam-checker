@@ -264,3 +264,103 @@ def generate_excel_export(
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
+
+
+def generate_exam_results_pdf(
+    exam_title: str,
+    subject_name: str,
+    students: List[Dict],
+    total_marks: float,
+) -> bytes:
+    """Generate a multi-page PDF report covering every student in an exam.
+
+    Args:
+        exam_title: Name of the exam.
+        subject_name: Subject the exam belongs to.
+        students: List of dicts with keys:
+            student_name, student_email, total_score, questions_and_scores
+            (list of dicts: question_text, student_answer, score, marks, feedback)
+        total_marks: Maximum possible score for the exam.
+
+    Returns:
+        PDF bytes.
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
+    )
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm)
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("Title2", parent=styles["Title"], fontSize=20, spaceAfter=4)
+    subtitle_style = ParagraphStyle("Sub", parent=styles["Normal"], fontSize=11, alignment=TA_CENTER, textColor=colors.grey)
+    heading_style = ParagraphStyle("H2", parent=styles["Heading2"], fontSize=13, spaceAfter=4)
+    body_style = ParagraphStyle("Body2", parent=styles["Normal"], fontSize=10, leading=14)
+    feedback_style = ParagraphStyle("FB", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#4F46E5"), leftIndent=10)
+    student_header_style = ParagraphStyle("SH", parent=styles["Heading3"], fontSize=13, textColor=colors.HexColor("#4F46E5"), spaceAfter=4)
+
+    elements = []
+
+    # Cover header
+    elements.append(Paragraph("Exam Results Report", title_style))
+    elements.append(Paragraph("Smart Exam Answer Checker", subtitle_style))
+    elements.append(Spacer(1, 2*mm))
+    elements.append(Paragraph(f"<b>{exam_title}</b> &nbsp;|&nbsp; {subject_name}", subtitle_style))
+    elements.append(Spacer(1, 6*mm))
+    elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#4F46E5")))
+    elements.append(Spacer(1, 8*mm))
+
+    if not students:
+        elements.append(Paragraph("No student results available for this exam.", body_style))
+        doc.build(elements)
+        return buf.getvalue()
+
+    for i, student in enumerate(students):
+        student_name = student.get("student_name", "Unknown")
+        student_email = student.get("student_email", "")
+        total_score = student.get("total_score", 0)
+        percentage = round((total_score / total_marks) * 100, 2) if total_marks > 0 else 0
+
+        # Student header
+        elements.append(Paragraph(f"Student {i + 1}: {student_name}", student_header_style))
+        info = [
+            ["Email:", student_email],
+            ["Total Score:", f"{total_score} / {total_marks}"],
+            ["Percentage:", f"{percentage}%"],
+        ]
+        t = Table(info, colWidths=[30*mm, 120*mm])
+        t.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 4*mm))
+
+        # Per-question breakdown
+        for q in student.get("questions_and_scores", []):
+            elements.append(Paragraph(f"<b>Question:</b> {q.get('question_text', '')[:300]}", body_style))
+            elements.append(Paragraph(f"<b>Answer:</b> {q.get('student_answer', '')[:500]}", body_style))
+            score_val = q.get("score", 0)
+            marks_val = q.get("marks", 0)
+            elements.append(Paragraph(f"<b>Score:</b> {score_val} / {marks_val}", body_style))
+            fb = q.get("feedback", "")
+            if fb:
+                elements.append(Paragraph(f"Feedback: {fb}", feedback_style))
+            elements.append(Spacer(1, 4*mm))
+
+        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.grey))
+        elements.append(Spacer(1, 6*mm))
+
+        # Page break between students except after the last one
+        if i < len(students) - 1:
+            elements.append(PageBreak())
+
+    doc.build(elements)
+    return buf.getvalue()

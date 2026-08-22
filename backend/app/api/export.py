@@ -13,7 +13,7 @@ from app.models.answer import StudentAnswer
 from app.models.exam import Exam
 from app.models.subject import Subject
 from app.core.deps import get_current_teacher
-from app.export_service import generate_excel_export
+from app.export_service import generate_excel_export, generate_exam_results_pdf
 
 router = APIRouter(prefix="/export", tags=["Export"])
 
@@ -204,5 +204,67 @@ def export_results_xlsx(
     return StreamingResponse(
         iter([content]),
         media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/results/{exam_id}/pdf")
+def export_results_pdf(
+    exam_id: int,
+    current_user: User = Depends(get_current_teacher),
+    db: Session = Depends(get_db),
+):
+    """Export exam results as a multi-page PDF report (teacher only).
+
+    One section per student: info, total score, percentage, and a
+    question-by-question breakdown with feedback.
+    """
+    exam, questions, student_rows, max_possible = _collect_results(exam_id, db)
+    _authorize_teacher(exam, current_user, db)
+
+    subject_name = exam.subject.name if exam.subject else ""
+
+    students = []
+    for data in student_rows:
+        qas = []
+        for q in questions:
+            answer = data["answers"].get(q.id)
+            if answer and answer.score:
+                qas.append({
+                    "question_text": q.question_text,
+                    "student_answer": answer.answer_text,
+                    "score": answer.score.total_score,
+                    "marks": q.marks,
+                    "feedback": answer.score.feedback or "",
+                })
+            elif answer:
+                qas.append({
+                    "question_text": q.question_text,
+                    "student_answer": answer.answer_text,
+                    "score": "Not graded",
+                    "marks": q.marks,
+                    "feedback": "",
+                })
+            else:
+                qas.append({
+                    "question_text": q.question_text,
+                    "student_answer": "Not submitted",
+                    "score": 0,
+                    "marks": q.marks,
+                    "feedback": "",
+                })
+        students.append({
+            "student_name": data["name"],
+            "student_email": data["email"],
+            "total_score": data["total_score"],
+            "questions_and_scores": qas,
+        })
+
+    content = generate_exam_results_pdf(exam.title, subject_name, students, max_possible)
+
+    filename = f"exam_{exam_id}_results.pdf"
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

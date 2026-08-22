@@ -67,41 +67,11 @@ export default function TeacherExportPage() {
     }
   };
 
-  const generateCSV = async (): Promise<string> => {
+  const handleExportPDF = async (): Promise<Blob> => {
     if (!selectedExamId) throw new Error("No exam selected");
-    const res = await exportApi.exportResults(Number(selectedExamId));
-
-    if (res.data instanceof Blob) {
-      const text = await res.data.text();
-      // If already CSV
-      if (text.includes(",")) return text;
-    }
-
-    // Generate CSV from preview data
-    if (!preview || preview.length === 0) {
-      throw new Error("No data to export. Load preview first.");
-    }
-
-    const headers = Object.keys(preview[0]);
-    const rows = preview.map((row) =>
-      headers.map((h) => {
-        const val = row[h];
-        if (typeof val === "string" && (val.includes(",") || val.includes('"'))) {
-          return `"${val.replace(/"/g, '""')}"`;
-        }
-        return String(val ?? "");
-      }).join(",")
-    );
-    return [headers.join(","), ...rows].join("\n");
-  };
-
-  const handleExportPDF = async (): Promise<Blob | void> => {
-    if (!selectedExamId) throw new Error("No exam selected");
-    const res = await exportApi.exportResults(Number(selectedExamId));
+    const res = await exportApi.exportResultsPdf(Number(selectedExamId));
     if (res.data instanceof Blob) return res.data;
-    // If JSON, create a simple text blob
-    const text = JSON.stringify(res.data, null, 2);
-    return new Blob([text], { type: "application/pdf" });
+    throw new Error("Unexpected response");
   };
 
   const generateExcel = async (): Promise<Blob> => {
@@ -124,7 +94,7 @@ export default function TeacherExportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Export Results</h1>
-        <p className="text-muted-foreground">Export exam results as PDF, CSV, or Excel</p>
+        <p className="text-muted-foreground">Export exam results as PDF or Excel</p>
       </div>
 
       {/* Exam selection */}
@@ -180,7 +150,6 @@ export default function TeacherExportPage() {
 
               <ExportButton
                 onExportPDF={handleExportPDF}
-                onExportCSV={generateCSV}
                 onExportExcel={generateExcel}
                 fileName={selectedExam ? `${selectedExam.title.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_")}_results` : "exam_results"}
               />
@@ -202,9 +171,9 @@ export default function TeacherExportPage() {
               <div className="flex items-start gap-3 p-4 rounded-lg border">
                 <FileSpreadsheet className="h-8 w-8 text-green-600 shrink-0" />
                 <div>
-                  <p className="font-medium">Excel / CSV Spreadsheet</p>
+                  <p className="font-medium">Excel Spreadsheet</p>
                   <p className="text-sm text-muted-foreground">
-                    Real Excel (.xlsx) workbook with a Summary sheet and per-question breakdown — Unicode-safe for Burmese text — plus a plain CSV option.
+                    Real Excel (.xlsx) workbook with a Summary sheet and per-question breakdown — Unicode-safe for Burmese text.
                   </p>
                 </div>
               </div>
