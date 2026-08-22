@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   LayoutDashboard, FileText, BarChart3, Users, Settings,
   ClipboardList, GraduationCap, UserCircle, X, Trophy, Brain, Scale, Bot,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const teacherNav: NavItem[] = [
   { title: "Students", href: "/teacher/students", icon: Users },
   { title: "Plagiarism Check", href: "/teacher/plagiarism", icon: Scale },
   { title: "AI Detection", href: "/teacher/ai-detection", icon: Bot },
+  { title: "Export", href: "/teacher/export", icon: FileSpreadsheet },
 ];
 
 const adminNav: NavItem[] = [
