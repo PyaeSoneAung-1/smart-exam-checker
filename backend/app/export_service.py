@@ -194,3 +194,73 @@ def generate_exam_pdf(
 
     doc.build(elements)
     return buf.getvalue()
+
+
+def generate_excel_export(
+    summary_headers: List[str],
+    summary_rows: List[List],
+    detail_headers: List[str],
+    detail_rows: List[List],
+    exam_title: str = "Exam Results",
+) -> bytes:
+    """Generate a real Excel (.xlsx) workbook with two sheets.
+
+    Sheet 1 "Summary" holds one row per student (totals + percentage).
+    Sheet 2 "Detailed Results" holds the per-question breakdown.
+
+    Returns:
+        .xlsx bytes.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill("solid", fgColor="4F46E5")
+    thin = Side(style="thin", color="D1D5DB")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    wrap = Alignment(vertical="top", wrap_text=True)
+
+    def write_sheet(ws, headers, rows, widths=None):
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = border
+        for row in rows:
+            ws.append(row)
+        for row_cells in ws.iter_rows(min_row=2):
+            for cell in row_cells:
+                cell.border = border
+                cell.alignment = wrap
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = ws.dimensions
+        if widths:
+            for idx, w in enumerate(widths, start=1):
+                ws.column_dimensions[get_column_letter(idx)].width = w
+        else:
+            # Auto-size columns from content (capped for readability)
+            for idx, col in enumerate(ws.columns, start=1):
+                max_len = 0
+                for cell in col:
+                    val = cell.value
+                    if val is None:
+                        continue
+                    length = len(str(val))
+                    if length > max_len:
+                        max_len = length
+                ws.column_dimensions[get_column_letter(idx)].width = min(max(max_len + 2, 10), 60)
+
+    ws_summary = wb.active
+    ws_summary.title = "Summary"
+    write_sheet(ws_summary, summary_headers, summary_rows)
+
+    ws_detail = wb.create_sheet("Detailed Results")
+    write_sheet(ws_detail, detail_headers, detail_rows, widths=[10, 22, 26] + [32, 10, 12, 12, 12, 14, 40, 12] * ((len(detail_headers) - 3) // 8) + [12, 14, 12])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

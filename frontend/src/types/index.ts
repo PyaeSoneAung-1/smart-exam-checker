@@ -48,6 +48,8 @@ export interface Exam {
   subject?: Subject;
   time_limit_minutes: number;
   total_marks: number;
+  available_from?: string | null;
+  available_until?: string | null;
   is_active: boolean;
   created_at: string;
   questions?: Question[];

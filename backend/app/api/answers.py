@@ -57,6 +57,10 @@ def submit_answer(
     if not exam or not exam.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Exam is not active")
 
+    availability_error = exam.availability_error()
+    if availability_error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=availability_error)
+
     existing = (
         db.query(StudentAnswer)
         .filter(
@@ -109,6 +113,10 @@ def submit_exam(
         exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
         if not exam or not exam.is_active:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exam for question {answer_data.question_id} is not active")
+
+        availability_error = exam.availability_error()
+        if availability_error:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=availability_error)
 
         existing = (
             db.query(StudentAnswer)

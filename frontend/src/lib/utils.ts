@@ -25,6 +25,53 @@ export function formatTime(minutes: number): string {
   return `${m}m`;
 }
 
+/**
+ * Backend datetimes are stored as naive UTC and serialized without a timezone
+ * suffix. JS `new Date("...")` would interpret them as local time, so parse
+ * them as UTC explicitly.
+ */
+export function parseUtc(iso?: string | null): Date | null {
+  if (!iso) return null;
+  const hasOffset = /(Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  const d = new Date(hasOffset ? iso : `${iso}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatUtcDateTime(iso?: string | null): string {
+  const d = parseUtc(iso);
+  if (!d) return "";
+  return d.toLocaleString("en-US", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+/** Convert a backend UTC datetime to a local `datetime-local` input value. */
+export function toLocalInputValue(iso?: string | null): string {
+  const d = parseUtc(iso);
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export type ExamWindowStatus = "open" | "upcoming" | "closed" | "no-window";
+
+/** Availability status of an exam relative to now (window + is_active). */
+export function getExamWindowStatus(exam: {
+  is_active: boolean;
+  available_from?: string | null;
+  available_until?: string | null;
+}): ExamWindowStatus {
+  if (!exam.is_active) return "closed";
+  if (!exam.available_from && !exam.available_until) return "open";
+  const now = Date.now();
+  const from = parseUtc(exam.available_from);
+  const until = parseUtc(exam.available_until);
+  if (from && now < from.getTime()) return "upcoming";
+  if (until && now > until.getTime()) return "closed";
+  return "open";
+}
+
 export function getRoleColor(role: string): string {
   switch (role) {
     case 'student': return 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950';

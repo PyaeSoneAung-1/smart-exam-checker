@@ -23,11 +23,12 @@ import {
 import CountdownTimer from "@/components/shared/CountdownTimer";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import {
-  Send, ArrowLeft, CheckCircle,
+  Send, ArrowLeft, CheckCircle, Lock,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { formatUtcDateTime } from "@/lib/utils";
 
 export default function TakeExamPage() {
   return (
@@ -50,6 +51,7 @@ function ExamContent() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState<string | null>(null);
   const submittedRef = useRef(false);
 
   useEffect(() => {
@@ -63,8 +65,16 @@ function ExamContent() {
         const init: Record<number, string> = {};
         qs.forEach((q: Question) => { init[q.id] = ""; });
         setAnswers(init);
-      } catch {
-        toast.error("Failed to load exam");
+      } catch (err) {
+        const apiErr = asApiError(err);
+        const status = apiErr?.response?.status;
+        const detail = apiErr?.response?.data?.detail;
+        if (status === 403 && typeof detail === "string") {
+          // Exam exists but is outside its availability window.
+          setNotAvailable(detail);
+        } else {
+          toast.error("Failed to load exam");
+        }
       } finally {
         setLoading(false);
       }
@@ -147,6 +157,20 @@ function ExamContent() {
       <div className="text-center py-12">
         <p className="text-lg text-muted-foreground">Exam not found</p>
         <Link href="/student/exams"><Button className="mt-4">Back to Exams</Button></Link>
+      </div>
+    );
+  }
+
+  // Outside the availability window — show a clear message instead of the paper.
+  if (notAvailable) {
+    return (
+      <div className="max-w-3xl mx-auto text-center py-12">
+        <Lock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Exam not available</h1>
+        <p className="text-muted-foreground mb-6">{notAvailable}</p>
+        <Link href="/student/exams">
+          <Button><ArrowLeft className="h-4 w-4 mr-2" /> Back to Exams</Button>
+        </Link>
       </div>
     );
   }
@@ -238,6 +262,11 @@ function ExamContent() {
           </Link>
           <h1 className="text-2xl font-bold">{exam.title}</h1>
           <p className="text-muted-foreground">{exam.total_marks} marks • {exam.time_limit_minutes} minutes</p>
+          {(exam.available_from || exam.available_until) && (
+            <p className="text-xs text-muted-foreground">
+              Window: {exam.available_from ? formatUtcDateTime(exam.available_from) : "—"} → {exam.available_until ? formatUtcDateTime(exam.available_until) : "—"}
+            </p>
+          )}
         </div>
         <div className="min-w-[200px]">
           <CountdownTimer

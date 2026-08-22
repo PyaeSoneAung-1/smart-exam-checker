@@ -8,8 +8,14 @@ import type { Exam, Question } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Plus, Trash2, FileText, ChevronDown, ChevronUp, Pencil, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
+import { formatUtcDateTime, toLocalInputValue } from "@/lib/utils";
 
 export default function TeacherExamDetailPage() {
   const { id } = useParams();
@@ -17,6 +23,17 @@ export default function TeacherExamDetailPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    total_marks: "",
+    time_limit_minutes: "",
+    is_active: true,
+    available_from: "",
+    available_until: "",
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -56,6 +73,54 @@ export default function TeacherExamDetailPage() {
     });
   };
 
+  const handleOpenEdit = () => {
+    if (!exam) return;
+    setEditForm({
+      title: exam.title,
+      description: exam.description || "",
+      total_marks: String(exam.total_marks),
+      time_limit_minutes: String(exam.time_limit_minutes ?? ""),
+      is_active: exam.is_active,
+      available_from: toLocalInputValue(exam.available_from),
+      available_until: toLocalInputValue(exam.available_until),
+    });
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!exam) return;
+    if (!editForm.title.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+    const availableFrom = editForm.available_from ? new Date(editForm.available_from).toISOString() : null;
+    const availableUntil = editForm.available_until ? new Date(editForm.available_until).toISOString() : null;
+    if (availableFrom && availableUntil && availableUntil <= availableFrom) {
+      toast.error("End date must be after start date");
+      return;
+    }
+    setSaving(true);
+    try {
+      await examsApi.update(exam.id, {
+        title: editForm.title.trim(),
+        description: editForm.description || undefined,
+        total_marks: Number(editForm.total_marks),
+        time_limit_minutes: editForm.time_limit_minutes ? Number(editForm.time_limit_minutes) : undefined,
+        is_active: editForm.is_active,
+        available_from: availableFrom,
+        available_until: availableUntil,
+      });
+      toast.success("Exam updated");
+      setEditOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update exam");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="text-center py-12 text-muted-foreground">Loading...</div>;
   if (!exam) return <div className="text-center py-12">Exam not found</div>;
 
@@ -73,12 +138,75 @@ export default function TeacherExamDetailPage() {
             <Badge>{exam.total_marks} marks</Badge>
             <Badge variant="outline">{exam.time_limit_minutes} min</Badge>
             <Badge variant="secondary">{questions.length} questions</Badge>
+            {(exam.available_from || exam.available_until) && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <CalendarDays className="h-3 w-3" />
+                {exam.available_from ? formatUtcDateTime(exam.available_from) : "—"} → {exam.available_until ? formatUtcDateTime(exam.available_until) : "—"}
+              </Badge>
+            )}
           </div>
         </div>
-        <Link href={`/teacher/exams/${id}/questions/new`}>
-          <Button><Plus className="h-4 w-4 mr-2" /> Add Question</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleOpenEdit}>
+            <Pencil className="h-4 w-4 mr-2" /> Edit Exam
+          </Button>
+          <Link href={`/teacher/exams/${id}/questions/new`}>
+            <Button><Plus className="h-4 w-4 mr-2" /> Add Question</Button>
+          </Link>
+        </div>
       </div>
+
+      {/* Edit exam dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Edit Exam</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Optional" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Total Marks</Label>
+                <Input type="number" value={editForm.total_marks} onChange={(e) => setEditForm({ ...editForm, total_marks: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Time (minutes)</Label>
+                <Input type="number" value={editForm.time_limit_minutes} onChange={(e) => setEditForm({ ...editForm, time_limit_minutes: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Available From (optional)</Label>
+                <Input type="datetime-local" value={editForm.available_from} onChange={(e) => setEditForm({ ...editForm, available_from: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Available Until (optional)</Label>
+                <Input type="datetime-local" value={editForm.available_until} onChange={(e) => setEditForm({ ...editForm, available_until: e.target.value })} />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Students can only take the exam inside this window. Leave empty for no date restriction.
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={editForm.is_active}
+                onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                className="h-4 w-4"
+              />
+              Exam is active (visible to students)
+            </label>
+            <Button onClick={handleSaveEdit} disabled={saving} className="w-full">
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>

@@ -8,66 +8,61 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, FileText, Table, Loader2 } from "lucide-react";
+import { Download, FileText, Table, FileSpreadsheet, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ExportButtonProps {
   onExportPDF?: () => Promise<Blob | void>;
   onExportCSV?: () => string | Promise<string>;
+  onExportExcel?: () => Promise<Blob | void>;
   disabled?: boolean;
   className?: string;
+  fileName?: string;
 }
 
 export default function ExportButton({
   onExportPDF,
   onExportCSV,
+  onExportExcel,
   disabled,
   className,
+  fileName = "export",
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
 
-  const downloadBlob = (blob: Blob, filename: string) => {
+  const downloadBlob = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const handleExportPDF = async () => {
-    if (!onExportPDF) return;
+  const runExport = async (fn: () => Promise<Blob | void> | string | Promise<string>, label: string, filename: string) => {
     setIsExporting(true);
     try {
-      const result = await onExportPDF();
+      const result = await fn();
       if (result instanceof Blob) {
-        downloadBlob(result, "report.pdf");
-        toast.success("PDF exported successfully");
+        downloadBlob(result, filename);
+      } else if (typeof result === "string") {
+        const blob = new Blob([result], { type: "text/csv;charset=utf-8;" });
+        downloadBlob(blob, filename);
       }
+      toast.success(`${label} exported successfully`);
     } catch {
-      toast.error("Failed to export PDF");
+      toast.error(`Failed to export ${label}`);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleExportCSV = async () => {
-    if (!onExportCSV) return;
-    setIsExporting(true);
-    try {
-      const csv = await onExportCSV();
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      downloadBlob(blob, "export.csv");
-      toast.success("CSV exported successfully");
-    } catch {
-      toast.error("Failed to export CSV");
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  const handleExportPDF = () => onExportPDF && runExport(onExportPDF, "PDF", `${fileName}.pdf`);
+  const handleExportCSV = () => onExportCSV && runExport(onExportCSV, "CSV", `${fileName}.csv`);
+  const handleExportExcel = () => onExportExcel && runExport(onExportExcel, "Excel", `${fileName}.xlsx`);
 
   return (
     <DropdownMenu>
@@ -94,6 +89,12 @@ export default function ExportButton({
           <DropdownMenuItem onClick={handleExportCSV}>
             <Table className="mr-2 h-4 w-4" />
             Export as CSV
+          </DropdownMenuItem>
+        )}
+        {onExportExcel && (
+          <DropdownMenuItem onClick={handleExportExcel}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Export as Excel (.xlsx)
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

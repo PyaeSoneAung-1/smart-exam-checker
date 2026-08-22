@@ -12,8 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Eye, Trash2, Search, Clock, Hash } from "lucide-react";
+import { FileText, Plus, Eye, Trash2, Search, Clock, Hash, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
+import { formatUtcDateTime } from "@/lib/utils";
 
 export default function TeacherExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -21,7 +22,7 @@ export default function TeacherExamsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30" });
+  const [form, setForm] = useState({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30", available_from: "", available_until: "" });
 
   const user = useAuthStore((s) => s.user);
 
@@ -59,6 +60,12 @@ export default function TeacherExamsPage() {
       toast.error("Title and subject required");
       return;
     }
+    const availableFrom = form.available_from ? new Date(form.available_from).toISOString() : undefined;
+    const availableUntil = form.available_until ? new Date(form.available_until).toISOString() : undefined;
+    if (availableFrom && availableUntil && availableUntil <= availableFrom) {
+      toast.error("End date must be after start date");
+      return;
+    }
     try {
       await examsApi.create({
         title: form.title,
@@ -66,9 +73,11 @@ export default function TeacherExamsPage() {
         subject_id: Number(form.subject_id),
         total_marks: Number(form.total_marks),
         time_limit_minutes: Number(form.time_limit_minutes),
+        available_from: availableFrom,
+        available_until: availableUntil,
       });
       toast.success(`Exam "${form.title}" created`);
-      setForm({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30" });
+      setForm({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30", available_from: "", available_until: "" });
       setDialogOpen(false);
       fetchData();
     } catch (err) {
@@ -139,6 +148,19 @@ export default function TeacherExamsPage() {
                   <Input type="number" value={form.time_limit_minutes} onChange={(e) => setForm({ ...form, time_limit_minutes: e.target.value })} />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Available From (optional)</Label>
+                  <Input type="datetime-local" value={form.available_from} onChange={(e) => setForm({ ...form, available_from: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Available Until (optional)</Label>
+                  <Input type="datetime-local" value={form.available_until} onChange={(e) => setForm({ ...form, available_until: e.target.value })} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Students can only take the exam inside this window. Leave empty for no date restriction.
+              </p>
               <Button onClick={handleCreate} className="w-full">Create Exam</Button>
             </div>
           </DialogContent>
@@ -212,6 +234,14 @@ export default function TeacherExamsPage() {
                       </Badge>
                     )}
                   </div>
+                  {(exam.available_from || exam.available_until) && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                      {exam.available_from ? formatUtcDateTime(exam.available_from) : "—"}
+                      {" → "}
+                      {exam.available_until ? formatUtcDateTime(exam.available_until) : "—"}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     {exam.is_active ? (
                       <Badge className="bg-green-100 text-green-700">Active</Badge>

@@ -9,6 +9,8 @@ class ExamCreate(BaseModel):
     description: Optional[str] = None
     total_marks: float = Field(..., gt=0)
     time_limit_minutes: Optional[int] = Field(None, gt=0)
+    available_from: Optional[datetime] = None
+    available_until: Optional[datetime] = None
     is_active: bool = True
 
 
@@ -17,6 +19,8 @@ class ExamUpdate(BaseModel):
     description: Optional[str] = None
     total_marks: Optional[float] = Field(None, gt=0)
     time_limit_minutes: Optional[int] = Field(None, gt=0)
+    available_from: Optional[datetime] = None
+    available_until: Optional[datetime] = None
     is_active: Optional[bool] = None
 
 
@@ -35,6 +39,8 @@ class ExamResponse(BaseModel):
     description: Optional[str]
     total_marks: float
     time_limit_minutes: Optional[int]
+    available_from: Optional[datetime] = None
+    available_until: Optional[datetime] = None
     is_active: bool
     created_at: datetime
 

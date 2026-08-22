@@ -31,8 +31,13 @@ export const examSchema = z.object({
   subject_id: z.number().positive("Please select a subject"),
   total_marks: z.number().min(1, "Total marks must be at least 1").max(1000),
   time_limit_minutes: z.number().min(5, "Minimum 5 minutes").max(300, "Maximum 5 hours"),
+  available_from: z.string().optional(),
+  available_until: z.string().optional(),
   is_active: z.boolean().optional(),
-});
+}).refine(
+  (data) => !data.available_from || !data.available_until || data.available_until > data.available_from,
+  { message: "End date must be after start date", path: ["available_until"] }
+);
 
 export const questionSchema = z.object({
   question_text: z.string().min(10, "Question must be at least 10 characters").max(2000),

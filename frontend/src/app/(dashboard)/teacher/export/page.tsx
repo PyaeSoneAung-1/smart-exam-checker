@@ -17,7 +17,7 @@ import { examsApi, exportApi } from "@/lib/api";
 import type { Exam } from "@/types";
 import ExportButton from "@/components/shared/ExportButton";
 import { toast } from "sonner";
-import { FileText, Table, Eye, Loader2 } from "lucide-react";
+import { FileText, Eye, Loader2, FileSpreadsheet } from "lucide-react";
 
 export default function TeacherExportPage() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -104,6 +104,13 @@ export default function TeacherExportPage() {
     return new Blob([text], { type: "application/pdf" });
   };
 
+  const generateExcel = async (): Promise<Blob> => {
+    if (!selectedExamId) throw new Error("No exam selected");
+    const res = await exportApi.exportResultsXlsx(Number(selectedExamId));
+    if (res.data instanceof Blob) return res.data;
+    throw new Error("Unexpected response");
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -117,7 +124,7 @@ export default function TeacherExportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Export Results</h1>
-        <p className="text-muted-foreground">Export exam results as PDF or CSV</p>
+        <p className="text-muted-foreground">Export exam results as PDF, CSV, or Excel</p>
       </div>
 
       {/* Exam selection */}
@@ -174,6 +181,8 @@ export default function TeacherExportPage() {
               <ExportButton
                 onExportPDF={handleExportPDF}
                 onExportCSV={generateCSV}
+                onExportExcel={generateExcel}
+                fileName={selectedExam ? `${selectedExam.title.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_")}_results` : "exam_results"}
               />
             </div>
 
@@ -191,11 +200,11 @@ export default function TeacherExportPage() {
                 </div>
               </div>
               <div className="flex items-start gap-3 p-4 rounded-lg border">
-                <Table className="h-8 w-8 text-green-500 shrink-0" />
+                <FileSpreadsheet className="h-8 w-8 text-green-600 shrink-0" />
                 <div>
-                  <p className="font-medium">CSV Spreadsheet</p>
+                  <p className="font-medium">Excel / CSV Spreadsheet</p>
                   <p className="text-sm text-muted-foreground">
-                    Marks spreadsheet with all students, scores, and grades in tabular format.
+                    Real Excel (.xlsx) workbook with a Summary sheet and per-question breakdown — Unicode-safe for Burmese text — plus a plain CSV option.
                   </p>
                 </div>
               </div>

@@ -7,7 +7,7 @@ import type {
 
 /** Minimal shape of an API error (axios error with a FastAPI-style detail). */
 export interface ApiErrorShape {
-  response?: { data?: { detail?: string } };
+  response?: { status?: number; data?: { detail?: string } };
   message?: string;
 }
 
@@ -103,7 +103,7 @@ export const examsApi = {
   getAll: (params?: { skip?: number; limit?: number; subject_id?: number }) =>
     api.get<{ items: Exam[]; total: number; page: number; size: number; pages: number }>('/exams', { params }),
   getById: (id: number) => api.get<Exam>(`/exams/${id}`),
-  create: (data: { subject_id: number; title: string; description?: string; total_marks: number; time_limit_minutes: number }) =>
+  create: (data: { subject_id: number; title: string; description?: string; total_marks: number; time_limit_minutes: number; available_from?: string | null; available_until?: string | null }) =>
     api.post<Exam>('/exams', data),
   update: (id: number, data: Partial<Exam>) => api.put<Exam>(`/exams/${id}`, data),
   delete: (id: number) => api.delete(`/exams/${id}`),
@@ -147,6 +147,8 @@ export const dashboardApi = {
 export const exportApi = {
   exportResults: (examId: number) =>
     api.get(`/export/results/${examId}`, { responseType: 'blob' }),
+  exportResultsXlsx: (examId: number) =>
+    api.get(`/export/results/${examId}/xlsx`, { responseType: 'blob' }),
 };
 
 // ---- Settings ----

@@ -38,6 +38,16 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created/verified.")
 
+    # Apply any schema upgrades for pre-existing databases
+    try:
+        from app.database import ensure_schema_upgrades
+        ensure_schema_upgrades()
+        logger.info("Schema upgrades applied.")
+    except Exception as e:
+        logger.error(f"Schema upgrade failed: {e}")
+        import traceback
+        traceback.print_exc()
+
     # Seed data
     try:
         seed_data()

@@ -7,8 +7,9 @@ import type { Exam, Answer } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, FileText, Play, CheckCircle } from "lucide-react";
+import { BookOpen, Clock, FileText, Play, CheckCircle, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
+import { getExamWindowStatus, formatUtcDateTime } from "@/lib/utils";
 
 export default function StudentExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -99,6 +100,12 @@ export default function StudentExamsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {exams.map((exam) => {
             const isCompleted = completedExamIds.has(exam.id);
+            const status = getExamWindowStatus(exam);
+            const canTake = status === "open";
+            const windowText =
+              exam.available_from || exam.available_until
+                ? `${exam.available_from ? formatUtcDateTime(exam.available_from) : "—"} → ${exam.available_until ? formatUtcDateTime(exam.available_until) : "—"}`
+                : null;
             return (
               <Card key={exam.id} className="hover:shadow-lg transition-shadow flex flex-col">
                 <CardHeader>
@@ -118,12 +125,23 @@ export default function StudentExamsPage() {
                       <Clock className="h-4 w-4" /> {exam.time_limit_minutes} min
                     </span>
                   </div>
+                  {windowText && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5 shrink-0" /> {windowText}
+                    </p>
+                  )}
                   {isCompleted ? (
                     <Badge className="bg-green-100 text-green-700 w-fit">
                       <CheckCircle className="h-3 w-3 mr-1" /> Completed
                     </Badge>
+                  ) : status === "upcoming" ? (
+                    <Badge className="bg-blue-100 text-blue-700 w-fit">
+                      Opens {exam.available_from ? formatUtcDateTime(exam.available_from) : "soon"}
+                    </Badge>
+                  ) : status === "closed" ? (
+                    <Badge variant="secondary" className="w-fit">Closed</Badge>
                   ) : (
-                    <Badge variant={exam.is_active ? "default" : "secondary"}>
+                    <Badge variant={exam.is_active ? "default" : "secondary"} className="w-fit">
                       {exam.is_active ? "Available" : "Inactive"}
                     </Badge>
                   )}
@@ -136,8 +154,8 @@ export default function StudentExamsPage() {
                       </Link>
                     ) : (
                       <Link href={`/student/exams/${exam.id}`}>
-                        <Button className="w-full" disabled={!exam.is_active}>
-                          <Play className="h-4 w-4 mr-2" /> Take Exam
+                        <Button className="w-full" disabled={!canTake}>
+                          <Play className="h-4 w-4 mr-2" /> {status === "upcoming" ? "Not open yet" : status === "closed" ? "Closed" : "Take Exam"}
                         </Button>
                       </Link>
                     )}

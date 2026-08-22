@@ -36,8 +36,19 @@ def create_exam(
         description=exam_data.description,
         total_marks=exam_data.total_marks,
         time_limit_minutes=exam_data.time_limit_minutes,
+        available_from=exam_data.available_from,
+        available_until=exam_data.available_until,
         is_active=exam_data.is_active,
     )
+    if (
+        exam.available_from
+        and exam.available_until
+        and exam.available_until <= exam.available_from
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="available_until must be after available_from",
+        )
     db.add(exam)
     db.commit()
     db.refresh(exam)
@@ -115,6 +126,11 @@ def get_exam(
             detail="This exam is not currently active",
         )
 
+    if current_user.role == UserRole.STUDENT:
+        error = exam.availability_error()
+        if error:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=error)
+
     return ExamDetailResponse(
         id=exam.id,
         subject_id=exam.subject_id,
@@ -122,6 +138,8 @@ def get_exam(
         description=exam.description,
         total_marks=exam.total_marks,
         time_limit_minutes=exam.time_limit_minutes,
+        available_from=exam.available_from,
+        available_until=exam.available_until,
         is_active=exam.is_active,
         created_at=exam.created_at,
         questions=[
@@ -153,6 +171,16 @@ def update_exam(
     update_data = exam_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(exam, field, value)
+
+    if (
+        exam.available_from
+        and exam.available_until
+        and exam.available_until <= exam.available_from
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="available_until must be after available_from",
+        )
 
     db.commit()
     db.refresh(exam)
