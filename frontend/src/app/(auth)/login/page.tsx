@@ -68,7 +68,7 @@ export default function LoginPage() {
           <CardContent className="p-8">
             {/* Brand */}
             <motion.div variants={item} className="mb-8 flex flex-col items-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-4 ring-indigo-500/20">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 ring-4 ring-cyan-500/20">
                 <GraduationCap className="h-8 w-8" />
               </div>
               <h1 className="text-2xl font-bold tracking-tight">Smart Exam Checker</h1>
@@ -138,7 +138,7 @@ export default function LoginPage() {
               <motion.div variants={item}>
                 <Button
                   type="submit"
-                  className="w-full bg-indigo-600 text-white hover:bg-indigo-700"
+                  className="w-full bg-cyan-600 text-white hover:bg-cyan-700"
                   disabled={isLoading}
                 >
                   {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : "Sign In"}

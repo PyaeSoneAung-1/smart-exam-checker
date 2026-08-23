@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="flex min-h-screen">
       {/* Left decorative panel */}
-      <div className="hidden w-1/2 bg-indigo-600 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
+      <div className="hidden w-1/2 bg-cyan-600 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
         <div className="max-w-md text-center text-white">
           <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 ring-2 ring-white/30 backdrop-blur-sm">
             <GraduationCap className="h-10 w-10" />

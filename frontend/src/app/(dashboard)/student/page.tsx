@@ -72,7 +72,7 @@ export default function StudentDashboardPage() {
     { label: "Exams Taken", value: d.total_exams_taken, icon: ClipboardCheck, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-600/10 dark:bg-blue-500/15" },
     { label: "Average Score", value: d.average_score.toFixed(1), icon: TrendingUp, color: "text-blue-500 dark:text-blue-300", bg: "bg-blue-500/10 dark:bg-blue-500/15" },
     { label: "Highest", value: d.highest_score.toFixed(1), icon: ArrowUpRight, color: "text-sky-500 dark:text-sky-300", bg: "bg-sky-500/10 dark:bg-sky-500/15" },
-    { label: "Lowest", value: d.lowest_score.toFixed(1), icon: ArrowDownRight, color: "text-indigo-500 dark:text-indigo-300", bg: "bg-indigo-500/10 dark:bg-indigo-500/15" },
+    { label: "Lowest", value: d.lowest_score.toFixed(1), icon: ArrowDownRight, color: "text-cyan-500 dark:text-cyan-300", bg: "bg-cyan-500/10 dark:bg-cyan-500/15" },
   ];
 
   return (
