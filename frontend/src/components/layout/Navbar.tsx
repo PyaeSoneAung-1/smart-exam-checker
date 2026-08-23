@@ -88,7 +88,7 @@ function MobileMenu({
             {user && (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-cyan-500 text-white">
+                  <AvatarFallback className="bg-indigo-500 text-white">
                     {getInitials(user.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -169,7 +169,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               </Button>
             )}
             <Link href={isAuthenticated ? dashboardPath : "/"} className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 ring-2 ring-cyan-500/40">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-2 ring-indigo-500/40">
                 <GraduationCap className="h-6 w-6" />
               </div>
               <span className="hidden text-lg font-bold tracking-tight sm:inline-block">
@@ -204,7 +204,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger className="hidden md:flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted cursor-pointer">
                     <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-cyan-500 text-white text-sm">
+                      <AvatarFallback className="bg-indigo-500 text-white text-sm">
                         {getInitials(user.name)}
                       </AvatarFallback>
                     </Avatar>
@@ -244,7 +244,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(true)}
                 >
                   <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-cyan-500 text-white text-sm">
+                    <AvatarFallback className="bg-indigo-500 text-white text-sm">
                       {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
