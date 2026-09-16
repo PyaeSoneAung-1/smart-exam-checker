@@ -1,27 +1,38 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.6
-sqlalchemy>=2.0.35
-alembic>=1.13.2
-psycopg2-binary>=2.9.9
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+# Core web stack
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+sqlalchemy==2.0.52
+alembic==1.20.0
+psycopg2-binary==2.9.13
+
+# Auth (PyJWT instead of python-jose: CVE-2024-33663/33664 affect jose<3.4)
+PyJWT==2.14.0
+passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-python-multipart>=0.0.9
-pydantic[email]>=2.9.2
-pydantic-settings>=2.5.2
-python-dotenv>=1.0.1
-spacy>=3.8.0
-sentence-transformers>=3.0.0
-language-tool-python>=2.7.1
-scikit-learn>=1.5.0
-redis>=5.0.0
-celery>=5.4.0
-httpx>=0.27.0
-pytest>=8.0.0
-numpy>=1.24.0
-slowapi>=0.1.9
-reportlab>=4.0
-openpyxl>=3.1.0
-sentry-sdk[fastapi]>=2.0.0
-websockets>=12.0
-psutil>=5.9.0
+python-multipart==0.0.32
+
+# Config / validation
+pydantic[email]==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+
+# NLP
+spacy==3.8.16
+scikit-learn==1.7.2
+numpy==2.2.6
+sentence-transformers==6.0.1
+language_tool_python==3.4.0
+
+# Exports
+reportlab==5.0.1
+openpyxl==3.1.5
+
+# Ops
+slowapi==0.1.10
+sentry-sdk[fastapi]==2.69.2
+websockets==16.1.1
+psutil==7.2.2
+
+# Development / testing
+httpx==0.28.1
+pytest==9.1.1

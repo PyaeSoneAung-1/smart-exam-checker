@@ -1,16 +1,40 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_current_teacher, get_current_user
 from app.database import get_db
-from app.models.user import User, UserRole
 from app.models.exam import Exam
-from app.models.subject import Subject
 from app.models.question import Question
-from app.schemas.question import QuestionCreate, QuestionUpdate, QuestionResponse
-from app.core.deps import get_current_user, get_current_teacher
-from app.utils.pagination import get_pagination_params, paginate_query, PaginationParams
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.schemas.question import (
+    QuestionCreate,
+    QuestionResponse,
+    QuestionStudentResponse,
+    QuestionUpdate,
+)
+from app.utils.pagination import PaginationParams, get_pagination_params, paginate_query
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
+
+
+def _require_owns_question(question: Question, current_user: User, db: Session) -> None:
+    """Teachers may only read/write questions of exams in their own subjects."""
+    if current_user.role == UserRole.ADMIN:
+        return
+    subject_id = (
+        db.query(Exam.subject_id).filter(Exam.id == question.exam_id).scalar()
+    )
+    owns = (
+        db.query(Subject.id)
+        .filter(Subject.id == subject_id, Subject.teacher_id == current_user.id)
+        .first()
+    )
+    if not owns:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this question",
+        )
 
 
 @router.post("/", response_model=QuestionResponse, status_code=status.HTTP_201_CREATED)
@@ -59,7 +83,7 @@ def list_questions(
 
     # Student: only see questions from active exams
     if current_user.role == UserRole.STUDENT:
-        active_exam_ids = [e.id for e in db.query(Exam).filter(Exam.is_active == True).all()]
+        active_exam_ids = [e.id for e in db.query(Exam).filter(Exam.is_active.is_(True)).all()]
         if active_exam_ids:
             query = query.filter(Question.exam_id.in_(active_exam_ids))
         else:
@@ -79,11 +103,12 @@ def list_questions(
 
     query = query.order_by(Question.created_at.desc())
     result = paginate_query(query, db, pagination)
-    result.items = [QuestionResponse.model_validate(q).model_dump() for q in result.items]
+    schema = QuestionStudentResponse if current_user.role == UserRole.STUDENT else QuestionResponse
+    result.items = [schema.model_validate(q).model_dump() for q in result.items]
     return result.model_dump()
 
 
-@router.get("/{question_id}", response_model=QuestionResponse)
+@router.get("/{question_id}")
 def get_question(
     question_id: int,
     current_user: User = Depends(get_current_user),
@@ -94,13 +119,15 @@ def get_question(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    # Student: only active exam questions
+    # Student: only active exam questions, and never the model answer
     if current_user.role == UserRole.STUDENT:
         exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
         if not exam or not exam.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+        return QuestionStudentResponse.model_validate(question)
 
-    return question
+    _require_owns_question(question, current_user, db)
+    return QuestionResponse.model_validate(question)
 
 
 @router.put("/{question_id}", response_model=QuestionResponse)
@@ -115,14 +142,7 @@ def update_question(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
-    subject = db.query(Subject).filter(Subject.id == exam.subject_id).first()
-
-    if subject.teacher_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to update this question",
-        )
+    _require_owns_question(question, current_user, db)
 
     update_data = question_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -144,14 +164,7 @@ def delete_question(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
-    subject = db.query(Subject).filter(Subject.id == exam.subject_id).first()
-
-    if subject.teacher_id != current_user.id and current_user.role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to delete this question",
-        )
+    _require_owns_question(question, current_user, db)
 
     db.delete(question)
     db.commit()

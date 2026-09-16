@@ -1,5 +1,4 @@
 """Tests for exam CRUD endpoints."""
-import pytest
 
 
 class TestCreateExam:

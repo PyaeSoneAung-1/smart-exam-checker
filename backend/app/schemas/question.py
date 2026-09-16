@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class QuestionCreate(BaseModel):
@@ -25,6 +26,18 @@ class QuestionResponse(BaseModel):
     model_answer: str
     marks: float
     keywords: Optional[List[str]]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QuestionStudentResponse(BaseModel):
+    """Question as seen by a student — never exposes the model answer."""
+
+    id: int
+    exam_id: int
+    question_text: str
+    marks: float
     created_at: datetime
 
     model_config = {"from_attributes": True}

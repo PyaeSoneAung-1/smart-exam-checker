@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.deps import get_current_teacher, get_current_user
 from app.database import get_db
-from app.models.user import User, UserRole
-from app.models.subject import Subject
 from app.models.exam import Exam
-from app.schemas.exam import ExamCreate, ExamUpdate, ExamResponse, ExamDetailResponse, QuestionBrief
-from app.core.deps import get_current_user, get_current_teacher, get_current_student
-from app.utils.pagination import get_pagination_params, paginate_query, PaginationParams
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.schemas.exam import ExamCreate, ExamDetailResponse, ExamResponse, ExamUpdate, QuestionBrief
+from app.utils.pagination import PaginationParams, get_pagination_params, paginate_query
 
 router = APIRouter(prefix="/exams", tags=["Exams"])
 
@@ -82,7 +82,7 @@ def list_exams(
     if is_active is not None:
         query = query.filter(Exam.is_active == is_active)
     elif current_user.role == UserRole.STUDENT:
-        query = query.filter(Exam.is_active == True)
+        query = query.filter(Exam.is_active.is_(True))
 
     if search:
         query = query.filter(Exam.title.ilike(f"%{search}%"))

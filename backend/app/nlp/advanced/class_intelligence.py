@@ -1,8 +1,8 @@
 """Class Intelligence Report — analyzes all students' performance patterns."""
 import re
 import statistics
-from typing import Dict, List, Tuple
 from collections import Counter, defaultdict
+from typing import Dict, List
 
 
 class ClassIntelligence:
@@ -106,7 +106,9 @@ class ClassIntelligence:
             difficulty = "Very Easy"
 
         # Discrimination index (how well the question separates strong/weak students)
-        sorted_scores = sorted(zip([e["student_id"] for e in entries], scores), key=lambda x: x[1])
+        sorted_scores = sorted(
+            zip([e["student_id"] for e in entries], scores, strict=False), key=lambda x: x[1]
+        )
         n = len(sorted_scores)
         if n >= 4:
             top_group = sorted_scores[int(n * 0.7):]
@@ -228,7 +230,7 @@ class ClassIntelligence:
                     for w in missed:
                         missed_count[w] += 1
 
-            # Keywords missed by >50% of students
+            # Keywords missed by more than 30% of the class
             for keyword, count in missed_count.most_common(5):
                 if count > total_students * 0.3:
                     mistakes.append({
@@ -296,7 +298,6 @@ class ClassIntelligence:
 
         # Pass/fail distribution
         pass_count = sum(1 for s in students if s["percentage"] >= 40)
-        fail_count = len(students) - pass_count
         insights.append(f"Pass rate: {pass_count}/{len(students)} ({pass_count/max(len(students),1)*100:.0f}%)")
 
         # Answer length insight
@@ -333,9 +334,14 @@ class ClassIntelligence:
         return recs
 
     def _letter_grade(self, pct: float) -> str:
-        if pct >= 90: return "A+"
-        if pct >= 80: return "A"
-        if pct >= 70: return "B"
-        if pct >= 60: return "C"
-        if pct >= 50: return "D"
+        if pct >= 90:
+            return "A+"
+        if pct >= 80:
+            return "A"
+        if pct >= 70:
+            return "B"
+        if pct >= 60:
+            return "C"
+        if pct >= 50:
+            return "D"
         return "F"

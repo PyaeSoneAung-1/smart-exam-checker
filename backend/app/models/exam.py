@@ -1,8 +1,11 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Boolean, Float
-from sqlalchemy.orm import relationship
 from datetime import datetime
 from typing import Optional
+
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
 from app.database import Base
+from app.utils.time import utcnow
 
 
 class Exam(Base):
@@ -19,7 +22,7 @@ class Exam(Base):
     available_from = Column(DateTime, nullable=True)
     available_until = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     subject = relationship("Subject", back_populates="exams")
     questions = relationship("Question", back_populates="exam", cascade="all, delete-orphan")
@@ -27,7 +30,7 @@ class Exam(Base):
     def availability_error(self, now: Optional[datetime] = None) -> Optional[str]:
         """Return a human-readable message if the exam is outside its
         availability window at the given time (defaults to now), else None."""
-        now = now or datetime.utcnow()
+        now = now or utcnow()
         if self.available_from and now < self.available_from:
             return (
                 "This exam opens on "

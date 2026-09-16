@@ -1,10 +1,26 @@
-"""Advanced Keyword Extraction using TF-IDF, RAKE, and spaCy NER."""
-from typing import List, Dict, Set, Tuple
-from collections import Counter
+"""Keyword extraction and matching against a model answer.
+
+Two strategies are combined: TF-IDF term scores and spaCy POS/NER analysis.
+Only meaningful single words and clean two-word noun phrases are kept, so junk
+fragments (e.g. "acts barrier") no longer end up as graded keywords.
+"""
+from typing import Dict, List, Tuple
+
 from sklearn.feature_extraction.text import TfidfVectorizer
-import numpy as np
 
 from app.nlp.tokenizer import TextPreprocessor
+
+# Terms that carry no meaning as a keyword
+_STOPWORD_FRAGMENTS = {
+    "the", "and", "for", "that", "this", "with", "from", "are", "was", "were",
+    "its", "their", "there", "then", "than", "has", "have", "had", "been",
+    "being", "will", "would", "can", "could", "should", "not", "but", "you",
+    "your", "they", "them", "which", "when", "where", "what", "who", "how",
+    "also", "such", "into", "other", "each", "some", "more", "most", "very",
+}
+
+# Verbs that make a two-word phrase a fragment rather than a concept
+_VERB_POS = {"VERB", "AUX"}
 
 
 class KeywordExtractor:
@@ -14,124 +30,120 @@ class KeywordExtractor:
         self.preprocessor = TextPreprocessor()
         self._vectorizer = TfidfVectorizer(
             max_features=200,
-            stop_words='english',
+            stop_words="english",
             ngram_range=(1, 2),
             min_df=1,
         )
 
     def extract_tfidf_keywords(self, text: str, top_n: int = 15) -> List[Tuple[str, float]]:
-        """Extract keywords using TF-IDF scoring."""
+        """Top TF-IDF terms (their score reflects within-text importance)."""
         try:
             tfidf_matrix = self._vectorizer.fit_transform([text])
             feature_names = self._vectorizer.get_feature_names_out()
             scores = tfidf_matrix.toarray()[0]
-            keyword_scores = list(zip(feature_names, scores))
-            keyword_scores.sort(key=lambda x: x[1], reverse=True)
+            keyword_scores = sorted(
+                zip(feature_names, scores, strict=False), key=lambda item: item[1], reverse=True
+            )
             return [(kw, float(score)) for kw, score in keyword_scores[:top_n] if score > 0]
         except Exception:
             return []
 
     def extract_spacy_keywords(self, text: str) -> List[str]:
-        """Extract keywords using spaCy POS tagging and NER."""
+        """Keywords from NER entities, single nouns and clean noun phrases."""
         doc = self.preprocessor.nlp(text)
         keywords = set()
 
-        # Named entities
         for ent in doc.ents:
-            keywords.add(ent.text.lower())
+            keywords.add(ent.text.lower().strip())
 
-        # Nouns and proper nouns
         for token in doc:
-            if token.pos_ in ('NOUN', 'PROPN') and not token.is_stop and len(token.text) > 2:
+            if token.pos_ in ("NOUN", "PROPN") and not token.is_stop and len(token.text) > 2:
                 keywords.add(token.lemma_.lower())
 
-        # Noun chunks (multi-word)
         for chunk in doc.noun_chunks:
-            clean = chunk.text.lower().strip()
-            if len(clean.split()) >= 2:
-                keywords.add(clean)
+            tokens = [t for t in chunk if not t.is_punct and not t.is_space]
+            # Keep only 2-word phrases made of content words (no verbs/stop words)
+            if len(tokens) != 2:
+                continue
+            if any(t.pos_ in _VERB_POS or t.is_stop for t in tokens):
+                continue
+            phrase = " ".join(t.lemma_.lower() for t in tokens).strip()
+            if all(len(word) > 2 for word in phrase.split()):
+                keywords.add(phrase)
 
         return list(keywords)
 
-    def extract_key_concepts(self, text: str) -> List[Dict[str, any]]:
-        """Extract key concepts with importance scores."""
-        concepts = []
+    def extract_key_concepts(self, text: str) -> List[Dict]:
+        """Key concepts with importance scores and the method that found them."""
+        concepts: List[Dict] = []
 
-        # TF-IDF keywords
-        tfidf_kws = self.extract_tfidf_keywords(text)
-        for kw, score in tfidf_kws:
-            concepts.append({"term": kw, "score": score, "method": "tfidf"})
+        for keyword, score in self.extract_tfidf_keywords(text):
+            concepts.append({"term": keyword, "score": score, "method": "tfidf"})
 
-        # spaCy keywords
-        spacy_kws = self.extract_spacy_keywords(text)
-        for kw in spacy_kws:
-            if not any(c["term"] == kw for c in concepts):
-                concepts.append({"term": kw, "score": 0.5, "method": "spacy"})
+        for keyword in self.extract_spacy_keywords(text):
+            if not any(concept["term"] == keyword for concept in concepts):
+                concepts.append({"term": keyword, "score": 0.5, "method": "spacy"})
 
-        # Sort by score
-        concepts.sort(key=lambda x: x["score"], reverse=True)
+        concepts.sort(key=lambda item: item["score"], reverse=True)
         return concepts
 
     def extract_from_model_answer(self, model_answer: str) -> List[str]:
-        """Extract important keywords from teacher's model answer."""
-        # Combine multiple extraction methods
-        tfidf_kws = [kw for kw, _ in self.extract_tfidf_keywords(model_answer, top_n=10)]
-        spacy_kws = self.extract_spacy_keywords(model_answer)
+        """Important keywords of a teacher's model answer (max 20)."""
+        tfidf_keywords = [kw for kw, _ in self.extract_tfidf_keywords(model_answer, top_n=10)]
+        spacy_keywords = self.extract_spacy_keywords(model_answer)
         nouns_verbs = self.preprocessor.get_nouns_and_verbs(model_answer)
-        noun_chunks = self.preprocessor.get_noun_chunks(model_answer)
 
-        # Merge and deduplicate
-        all_keywords = list(dict.fromkeys(tfidf_kws + spacy_kws + nouns_verbs + noun_chunks))
+        merged = list(dict.fromkeys(tfidf_keywords + spacy_keywords + nouns_verbs))
 
-        # Filter: keep meaningful terms only
         filtered = []
-        for kw in all_keywords:
-            kw = kw.strip().lower()
-            if len(kw) > 2 and kw not in ('the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was', 'were'):
-                filtered.append(kw)
+        for keyword in merged:
+            keyword = keyword.strip().lower()
+            if len(keyword) <= 2:
+                continue
+            words = keyword.split()
+            if any(word in _STOPWORD_FRAGMENTS or len(word) <= 2 for word in words):
+                continue
+            filtered.append(keyword)
 
         return filtered[:20]
 
     def check_keywords_in_answer(
         self, model_keywords: List[str], student_answer: str
-    ) -> Dict[str, any]:
-        """Check which model keywords appear in student answer."""
+    ) -> Dict:
+        """Which model keywords appear in the student answer.
+
+        A multi-word keyword counts as found only when *all* of its words are
+        present (exact, lemma or token match) — a single shared word is not
+        evidence that the student covered the concept.
+        """
         student_lower = student_answer.lower()
-        student_tokens = set(self.preprocessor.tokenize_meaningful(student_answer))
-        student_lemmas = self.preprocessor.lemmatize(student_answer).lower()
+        student_tokens = {token.lower() for token in self.preprocessor.tokenize(student_answer)}
+        student_lemmas = set(self.preprocessor.tokenize_meaningful(student_answer))
+        student_lemmas_text = self.preprocessor.lemmatize(student_answer).lower()
 
-        found = []
-        missing = []
+        found, missing = [], []
+        for keyword in model_keywords:
+            keyword_lower = keyword.lower()
+            if keyword_lower in student_lower or keyword_lower in student_lemmas_text:
+                found.append(keyword)
+                continue
 
-        for kw in model_keywords:
-            kw_lower = kw.lower()
-            # Exact match
-            if kw_lower in student_lower:
-                found.append(kw)
+            keyword_tokens = set(keyword_lower.split())
+            if keyword_tokens and keyword_tokens.issubset(student_tokens | student_lemmas):
+                found.append(keyword)
                 continue
-            # Lemma match
-            if kw_lower in student_lemmas:
-                found.append(kw)
-                continue
-            # Token overlap (for multi-word keywords)
-            kw_tokens = set(kw_lower.split())
-            if kw_tokens.issubset(student_tokens):
-                found.append(kw)
-                continue
-            # Partial match (any word of keyword in student)
-            if any(t in student_tokens for t in kw_tokens):
-                found.append(kw)
-                continue
-            missing.append(kw)
 
+            missing.append(keyword)
+
+        total = len(model_keywords)
         return {
             "found": found,
             "missing": missing,
             "found_count": len(found),
-            "total_count": len(model_keywords),
-            "match_ratio": len(found) / max(len(model_keywords), 1),
+            "total_count": total,
+            "match_ratio": len(found) / total if total else 0.0,
         }
 
 
-# Singleton
+# Backwards-compatible module-level instance
 keyword_extractor = KeywordExtractor()

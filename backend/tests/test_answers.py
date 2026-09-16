@@ -1,5 +1,4 @@
 """Tests for answer submission endpoints."""
-import pytest
 
 
 class TestSubmitAnswer:
@@ -45,7 +44,7 @@ class TestSubmitAnswer:
             "question_id": test_question.id,
             "answer_text": "Second attempt",
         }, headers=auth_student_headers)
-        assert resp.status_code == 400
+        assert resp.status_code == 409
         assert "already submitted" in resp.json()["detail"].lower()
 
     def test_submit_answer_empty_text(self, client, auth_student_headers, test_question):

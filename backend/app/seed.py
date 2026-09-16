@@ -10,22 +10,28 @@ Idempotent:
 
 import logging
 import random
-from datetime import datetime, timedelta
+import secrets
+from datetime import timedelta
+from typing import Optional
 
-from app.database import SessionLocal, Base, engine
-from app.models.user import User, UserRole
-from app.models.subject import Subject
+from app.config import settings
+from app.core.security import get_password_hash
+from app.database import Base, SessionLocal, engine
+from app.models.answer import Score, StudentAnswer
 from app.models.exam import Exam
 from app.models.question import Question
-from app.models.answer import StudentAnswer, Score
-from app.core.security import get_password_hash
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
-# Seed passwords
-ADMIN_PASSWORD = "123456"
-TEACHER_PASSWORD = "123456"
-STUDENT_PASSWORD = "123456"
+# Generated credentials to print once after seeding (never written to disk)
+generated_password_log: list = []
+
+# Demo accounts. Passwords come from configuration: DEMO_PASSWORD for the
+# demo users (default "123456" outside production) and ADMIN_PASSWORD for the
+# administrator account. Nothing is ever logged in plain text.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pre-written sample answers for each of the 10 seeded questions (varied quality)
@@ -116,6 +122,28 @@ SAMPLE_ANSWER_POOL = [
 ]
 
 
+def _demo_password() -> Optional[str]:
+    """Password for demo accounts (None when demo seeding is disabled)."""
+    return settings.DEMO_PASSWORD or settings.ADMIN_PASSWORD
+
+
+def _admin_password() -> str:
+    """Admin password: ADMIN_PASSWORD, else the demo password, else generated."""
+    if settings.ADMIN_PASSWORD:
+        return settings.ADMIN_PASSWORD
+    if settings.DEMO_PASSWORD:
+        # Development: the documented demo password keeps the demo logins usable.
+        return settings.DEMO_PASSWORD
+    generated = secrets.token_urlsafe(12)
+    logger.warning(
+        "ADMIN_PASSWORD is not set — generated a random administrator password "
+        "for %s. Set ADMIN_PASSWORD in .env and change it after the first login.",
+        settings.ADMIN_EMAIL,
+    )
+    generated_password_log.append(generated)
+    return generated
+
+
 def _feedback_for(pct: float) -> str:
     if pct >= 80:
         return "🌟 Excellent answer! Outstanding work."
@@ -139,17 +167,6 @@ def _create_student_answers(db, student, questions, score_range, base_time):
     for q_idx, question in enumerate(questions):
         pool = SAMPLE_ANSWER_POOL[q_idx]
         answer_text = pool[student.id % len(pool)]
-
-        # Plagiarism test: Pyae Myat Phyo copies Pyae Sone Aung's Q#7 answer.
-        # (Only relevant for the original students; harmless for the new ones.)
-        if student.name == "Pyae Myat Phyo" and q_idx == 6:
-            answer_text = (
-                "Symmetric encryption uses the same key for both encryption and decryption, "
-                "making it faster but requiring secure key sharing. Asymmetric encryption uses "
-                "a public-private key pair, where the public key encrypts and the private key "
-                "decrypts. Asymmetric is slower but more secure for key exchange. Common symmetric "
-                "algorithms include AES, while RSA is a popular asymmetric algorithm."
-            )
 
         submitted = base_time + timedelta(
             days=random.randint(1, 25),
@@ -280,7 +297,7 @@ def _seed_new_exams(db):
         t = db.query(User).filter(User.email == email).first()
         if not t:
             t = User(name=name, email=email,
-                     hashed_password=get_password_hash(TEACHER_PASSWORD),
+                     hashed_password=get_password_hash(_demo_password() or secrets.token_urlsafe(12)),
                      role=UserRole.TEACHER, is_active=True)
             db.add(t)
             db.flush()
@@ -305,7 +322,7 @@ def _seed_new_exams(db):
             e = Exam(subject_id=subject_by_name[subj_name].id, title=title,
                      description=desc, total_marks=50.0,
                      time_limit_minutes=60, is_active=True,
-                     created_at=datetime.utcnow() - timedelta(days=14))
+                     created_at=utcnow() - timedelta(days=14))
             db.add(e)
             db.flush()
         exam_by_subject[subj_name] = e
@@ -328,7 +345,7 @@ def _seed_new_exams(db):
                     SCORE_RANGES["medium_low"], SCORE_RANGES["low"],
                     SCORE_RANGES["low"]]
     pool_by_text = dict(NEW_ANSWER_POOL)
-    base_time = datetime.utcnow() - timedelta(days=20)
+    base_time = utcnow() - timedelta(days=20)
     created = 0
     for email, idx in NEW_STUDENT_LEVELS.items():
         student = (db.query(User)
@@ -394,8 +411,8 @@ def seed_data():
             # ──────────────────────────────────────────────
             admin = User(
                 name="System Admin",
-                email="admin@smartexam.com",
-                hashed_password=get_password_hash(ADMIN_PASSWORD),
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(_admin_password()),
                 role=UserRole.ADMIN,
                 is_active=True,
             )
@@ -410,7 +427,7 @@ def seed_data():
                 t = User(
                     name=name,
                     email=email,
-                    hashed_password=get_password_hash(TEACHER_PASSWORD),
+                    hashed_password=get_password_hash(_demo_password() or secrets.token_urlsafe(12)),
                     role=UserRole.TEACHER,
                     is_active=True,
                 )
@@ -426,7 +443,7 @@ def seed_data():
                 s = User(
                     name=name,
                     email=email,
-                    hashed_password=get_password_hash(STUDENT_PASSWORD),
+                    hashed_password=get_password_hash(_demo_password() or secrets.token_urlsafe(12)),
                     role=UserRole.STUDENT,
                     is_active=True,
                 )
@@ -453,7 +470,7 @@ def seed_data():
             # ──────────────────────────────────────────────
             # 3. CREATE EXAMS (1 per subject = 2 total)
             # ──────────────────────────────────────────────
-            base_time = datetime.utcnow() - timedelta(days=30)
+            base_time = utcnow() - timedelta(days=30)
 
             exam_data = [
                 (subjects[0], "E-5101 Midterm Exam",
@@ -557,9 +574,8 @@ def seed_data():
 
             db.commit()
             logger.info("Seed data created successfully!")
-            logger.info("  - 1 admin (admin@smartexam.com / 123456)")
-            logger.info("  - 2 teachers (dawnilarwin@gmail.com, dawnweniwin@gmail.com / 123456)")
-            logger.info("  - 2 students (pyaesoneaung@gmail.com, pyaemyatphyo@gmail.com / 123456)")
+            logger.info("  - 1 admin (%s)", settings.ADMIN_EMAIL)
+            logger.info("  - 2 teachers, 2 students (demo accounts)")
             logger.info("  - 2 subjects, 2 exams, 10 questions")
             logger.info(f"  - {answer_count} student answers with scores")
 
@@ -570,12 +586,64 @@ def seed_data():
         _seed_extra_students(db)
         _seed_new_exams(db)
 
+        # ─────────────────────────────────────────────────────────────────
+        # 7. DEMO PLAGIARISM CASE
+        #    Pyae Myat Phyo submits Pyae Sone Aung's encryption answer
+        #    verbatim, so the plagiarism checker has a real positive example.
+        # ─────────────────────────────────────────────────────────────────
+        _create_plagiarism_demo(db)
+
+        for generated in generated_password_log:
+            logger.warning("Generated admin password (store it securely): %s", generated)
+
     except Exception as e:
         db.rollback()
         logger.error(f"Error seeding data: {e}")
         raise
     finally:
         db.close()
+
+
+def _create_plagiarism_demo(db) -> None:
+    """Copy one student's answer verbatim to another (idempotent)."""
+    source = db.query(User).filter(User.email == "pyaesoneaung@gmail.com").first()
+    copier = db.query(User).filter(User.email == "pyaemyatphyo@gmail.com").first()
+    if not source or not copier:
+        return
+
+    question = (
+        db.query(Question)
+        .filter(Question.question_text.ilike("%symmetric%"))
+        .first()
+    )
+    if not question:
+        return
+
+    source_answer = (
+        db.query(StudentAnswer)
+        .filter(StudentAnswer.question_id == question.id, StudentAnswer.student_id == source.id)
+        .first()
+    )
+    copier_answer = (
+        db.query(StudentAnswer)
+        .filter(StudentAnswer.question_id == question.id, StudentAnswer.student_id == copier.id)
+        .first()
+    )
+    if source_answer and copier_answer and copier_answer.answer_text != source_answer.answer_text:
+        copier_answer.answer_text = source_answer.answer_text
+        db.commit()
+        logger.info("Plagiarism demo: %s copied %s's answer (question %s)", copier.name, source.name, question.id)
+
+
+def main() -> None:  # pragma: no cover - CLI entry point
+    """CLI: create the schema and seed the demo database."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
+    Base.metadata.create_all(bind=engine)
+    seed_data()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()
 
 
 def _seed_extra_students(db):
@@ -604,7 +672,7 @@ def _seed_extra_students(db):
         return
 
     logger.info("Adding 3 extra students with exam answers...")
-    base_time = datetime.utcnow() - timedelta(days=30)
+    base_time = utcnow() - timedelta(days=30)
 
     created = 0
     for name, email, profile in extra_students:
@@ -616,7 +684,7 @@ def _seed_extra_students(db):
         student = User(
             name=name,
             email=email,
-            hashed_password=get_password_hash(STUDENT_PASSWORD),
+            hashed_password=get_password_hash(_demo_password() or secrets.token_urlsafe(12)),
             role=UserRole.STUDENT,
             is_active=True,
         )
@@ -628,8 +696,5 @@ def _seed_extra_students(db):
         )
 
     db.commit()
-    logger.info("Extra students created:")
-    logger.info("  - San Lin Aung  (sanlinaung@gmail.com / 123456)")
-    logger.info("  - Swan Yee Htut (swanyeehtut@gmail.com / 123456)")
-    logger.info("  - Thura Hein    (thurahein@gmail.com / 123456)")
+    logger.info("Extra students created: San Lin Aung, Swan Yee Htut, Thura Hein")
     logger.info(f"  - {created} extra student answers with scores")

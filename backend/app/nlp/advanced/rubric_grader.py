@@ -1,6 +1,6 @@
 """Smart Grading Rubric — evaluates answers on 5 criteria with detailed feedback."""
 import re
-from typing import Dict, List
+from typing import Dict
 
 
 class RubricGrader:
@@ -179,7 +179,7 @@ class RubricGrader:
         if len(sentences) >= 3:
             lengths = [len(s.split()) for s in sentences]
             mean_len = sum(lengths) / len(lengths)
-            variance = sum((l - mean_len) ** 2 for l in lengths) / len(lengths)
+            variance = sum((length - mean_len) ** 2 for length in lengths) / len(lengths)
             if variance > 10:
                 score += 3  # Good variety
             elif variance > 5:
@@ -353,11 +353,16 @@ class RubricGrader:
             return "Needs significant improvement. The answer does not demonstrate sufficient understanding. Please review course materials."
 
     def _letter_grade(self, total: float) -> str:
-        if total >= 90: return "A+"
-        if total >= 80: return "A"
-        if total >= 70: return "B"
-        if total >= 60: return "C"
-        if total >= 50: return "D"
+        if total >= 90:
+            return "A+"
+        if total >= 80:
+            return "A"
+        if total >= 70:
+            return "B"
+        if total >= 60:
+            return "C"
+        if total >= 50:
+            return "D"
         return "F"
 
     def _empty_result(self, total_marks: float) -> Dict:

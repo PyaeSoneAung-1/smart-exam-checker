@@ -1,25 +1,28 @@
 import csv
 import io
-import uuid
+import secrets
 import time
+import uuid
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
-from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional
 
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.core.deps import get_current_admin, get_current_admin_or_teacher, get_current_user
+from app.core.security import get_password_hash
 from app.database import get_db
+from app.file_upload import _content_matches_type
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
-from app.core.deps import get_current_admin, get_current_user, get_current_admin_or_teacher
-from app.core.security import get_password_hash
-from app.utils.pagination import get_pagination_params, paginate_query, PaginationParams
+from app.utils.pagination import PaginationParams, get_pagination_params, paginate_query
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "profile_photos"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_BULK_PASSWORD = "password123"
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -51,14 +54,16 @@ def create_user(
 
 @router.post("/bulk-import", response_model=dict, status_code=status.HTTP_201_CREATED)
 def bulk_import_users(
-    file: UploadFile = File(..., description="CSV file with columns: name, email, role, password (password is optional, defaults to 'password123')"),
+    file: UploadFile = File(..., description="CSV file with columns: name, email, role, password (optional)"),
     current_user: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """Bulk import users from a CSV file (admin only).
-    
+
     CSV columns: name, email, role, password
-    - password is optional; defaults to 'password123'
+    - password is optional: each row without one gets a random password which
+      is returned once in this response (set BULK_IMPORT_PASSWORD to use a
+      fixed shared password instead)
     - role is optional; defaults to 'student'
     """
     if not file.filename.endswith(".csv"):
@@ -78,7 +83,10 @@ def bulk_import_users(
         name = row.get("name", "").strip()
         email = row.get("email", "").strip()
         role_str = row.get("role", "student").strip().lower()
-        password = row.get("password", DEFAULT_BULK_PASSWORD).strip() or DEFAULT_BULK_PASSWORD
+        password = (row.get("password") or "").strip() or settings.BULK_IMPORT_PASSWORD
+        generated = password is None
+        if generated:
+            password = secrets.token_urlsafe(9)
 
         if not name or not email:
             errors.append(f"Row {i}: missing name or email")
@@ -104,7 +112,10 @@ def bulk_import_users(
             is_active=True,
         )
         db.add(user)
-        created_users.append({"name": name, "email": email, "role": role.value})
+        entry = {"name": name, "email": email, "role": role.value}
+        if generated:
+            entry["temporary_password"] = password
+        created_users.append(entry)
 
     db.commit()
 
@@ -254,14 +265,25 @@ def upload_profile_photo(
             detail="File must be an image (JPEG, PNG, GIF, or WebP)",
         )
 
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    ext = Path(file.filename or "").suffix.lower().lstrip(".") or "jpg"
     filename = f"{user_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}.{ext}"
     file_path = UPLOAD_DIR / filename
 
-    with open(file_path, "wb") as f:
-        f.write(file.file.read())
+    content = file.file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file upload.")
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large. Max size: 5 MB")
+    if not _content_matches_type(content, file.content_type or ""):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content does not match its declared type.",
+        )
 
-    user.profile_photo = f"/uploads/profile_photos/{filename}"
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    user.profile_photo = f"/api/files/profile_photos/{filename}"
     db.commit()
     db.refresh(user)
     return user

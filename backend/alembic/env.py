@@ -21,6 +21,9 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# SQLite needs batch mode to ALTER/DROP constraints (render_as_batch).
+_IS_SQLITE = settings.DATABASE_URL.startswith("sqlite")
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -48,6 +51,8 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            compare_type=True,
+            render_as_batch=_IS_SQLITE,
         )
 
         with context.begin_transaction():

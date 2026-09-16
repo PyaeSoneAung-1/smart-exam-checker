@@ -40,7 +40,6 @@ class ModelAnswerGenerator:
         """Generate a model answer for a question."""
         q = question_text.strip()
         q_lower = q.lower()
-        words = q_lower.split()
 
         # Detect question type
         q_type = self._detect_question_type(q_lower)
@@ -239,45 +238,43 @@ class ModelAnswerGenerator:
 
     def _generate_generic_answer(self, question: str, q_type: str, topics: List[str]) -> str:
         """Generate a generic but structured answer."""
-        q_lower = question.lower()
-
         if q_type == "definition":
-            return (f"This concept refers to a fundamental principle in the subject area. "
-                    f"It encompasses several key aspects including methodology, implementation, "
-                    f"and practical applications. Understanding this topic is essential for "
-                    f"building a comprehensive foundation in the field.")
+            return ("This concept refers to a fundamental principle in the subject area. "
+                    "It encompasses several key aspects including methodology, implementation, "
+                    "and practical applications. Understanding this topic is essential for "
+                    "building a comprehensive foundation in the field.")
 
         if q_type == "list":
-            return (f"The key elements include several important components that work together. "
-                    f"First, foundational principles establish the base framework. Second, "
-                    f"practical applications demonstrate real-world relevance. Third, "
-                    f"best practices ensure optimal implementation. Each element contributes "
-                    f"significantly to the overall effectiveness of the system.")
+            return ("The key elements include several important components that work together. "
+                    "First, foundational principles establish the base framework. Second, "
+                    "practical applications demonstrate real-world relevance. Third, "
+                    "best practices ensure optimal implementation. Each element contributes "
+                    "significantly to the overall effectiveness of the system.")
 
         if q_type == "comparison":
-            return (f"The two concepts differ in several important ways. The first emphasizes "
-                    f"structure, formality, and established protocols, while the second focuses "
-                    f"on flexibility, accessibility, and practical application. Both share "
-                    f"common goals of effectiveness and clarity but approach them through "
-                    f"different methodologies and frameworks.")
+            return ("The two concepts differ in several important ways. The first emphasizes "
+                    "structure, formality, and established protocols, while the second focuses "
+                    "on flexibility, accessibility, and practical application. Both share "
+                    "common goals of effectiveness and clarity but approach them through "
+                    "different methodologies and frameworks.")
 
         if q_type == "process":
-            return (f"The process involves several interconnected steps. Initially, assessment "
-                    f"and planning establish the foundation. Subsequently, implementation follows "
-                    f"established best practices and methodologies. Finally, evaluation and "
-                    f"feedback ensure continuous improvement and optimal outcomes.")
+            return ("The process involves several interconnected steps. Initially, assessment "
+                    "and planning establish the foundation. Subsequently, implementation follows "
+                    "established best practices and methodologies. Finally, evaluation and "
+                    "feedback ensure continuous improvement and optimal outcomes.")
 
         if q_type == "reasoning":
-            return (f"This is significant because it directly impacts organizational effectiveness "
-                    f"and outcomes. The underlying principles demonstrate that proper implementation "
-                    f"leads to measurable improvements in performance, efficiency, and stakeholder "
-                    f"satisfaction. Research and practical experience support the importance of "
-                    f"this topic in achieving sustainable success.")
+            return ("This is significant because it directly impacts organizational effectiveness "
+                    "and outcomes. The underlying principles demonstrate that proper implementation "
+                    "leads to measurable improvements in performance, efficiency, and stakeholder "
+                    "satisfaction. Research and practical experience support the importance of "
+                    "this topic in achieving sustainable success.")
 
-        return (f"This topic addresses important concepts in the subject area. It involves "
-                f"understanding key principles, applying best practices, and evaluating outcomes "
-                f"to achieve optimal results. A comprehensive approach considers multiple "
-                f"perspectives and integrates various methodologies for maximum effectiveness.")
+        return ("This topic addresses important concepts in the subject area. It involves "
+                "understanding key principles, applying best practices, and evaluating outcomes "
+                "to achieve optimal results. A comprehensive approach considers multiple "
+                "perspectives and integrates various methodologies for maximum effectiveness.")
 
     def _extract_key_points(self, answer: str) -> List[str]:
         """Extract key points from the generated answer."""
@@ -308,7 +305,6 @@ class ModelAnswerGenerator:
 
     def _estimate_marks(self, question: str, q_type: str) -> int:
         """Estimate appropriate marks for the question."""
-        word_count = len(question.split())
         if q_type in ["analysis", "comparison", "reasoning"]:
             return 15
         if q_type in ["explanation", "process"]:

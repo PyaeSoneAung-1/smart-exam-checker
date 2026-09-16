@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from app.database import Base
+from app.utils.time import utcnow
 
 
 class Subject(Base):
@@ -11,7 +12,7 @@ class Subject(Base):
     name = Column(String(255), nullable=False, unique=True)
     description = Column(Text, nullable=True)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     teacher = relationship("User", foreign_keys=[teacher_id])
     exams = relationship("Exam", back_populates="subject", cascade="all, delete-orphan")

@@ -1,16 +1,24 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import datetime, timedelta
 
+from fastapi import APIRouter, Depends
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.deps import get_current_admin, get_current_student, get_current_teacher
 from app.database import get_db
-from app.models.user import User, UserRole
-from app.models.subject import Subject
+from app.models.answer import Score, StudentAnswer
 from app.models.exam import Exam
 from app.models.question import Question
-from app.models.answer import StudentAnswer, Score
-from app.schemas.dashboard import StudentDashboard, TeacherDashboard, AdminDashboard, StatsResponse, RecentSubmissionResponse
-from app.core.deps import get_current_user, get_current_student, get_current_teacher, get_current_admin
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.schemas.dashboard import (
+    AdminDashboard,
+    RecentSubmissionResponse,
+    StatsResponse,
+    StudentDashboard,
+    TeacherDashboard,
+)
+from app.utils.time import utcnow
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -217,7 +225,7 @@ def admin_dashboard(
     ).scalar()
     avg_score = round(float(avg_result), 1) if avg_result else 0.0
 
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    week_ago = utcnow() - timedelta(days=7)
     recent_registrations = db.query(User).filter(User.created_at >= week_ago).count()
 
     return AdminDashboard(

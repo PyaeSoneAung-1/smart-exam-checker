@@ -1,18 +1,26 @@
 """Pytest fixtures for Smart Exam Answer Checker tests."""
-import pytest
+import os
+
+# Configure the app before importing it: no demo seeding into the real database
+# and no rate limiting that would interfere with the test client.
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("SEED_DEMO_DATA", "false")
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-0123456789abcdef")
+
+import pytest  # noqa: E402
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.security import create_access_token, get_password_hash
 from app.database import Base, get_db
 from app.main import app
-from app.models.user import User, UserRole
-from app.models.subject import Subject
 from app.models.exam import Exam
 from app.models.question import Question
-from app.core.security import get_password_hash, create_access_token
-
+from app.models.subject import Subject
+from app.models.user import User, UserRole
 
 # In-memory SQLite for tests
 SQLALCHEMY_TEST_URL = "sqlite://"

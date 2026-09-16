@@ -1,10 +1,9 @@
 """Tests for NLP engine components."""
-import pytest
-from app.nlp.tokenizer import TextPreprocessor
-from app.nlp.keyword_extractor import KeywordExtractor
-from app.nlp.similarity import SemanticSimilarity
 from app.nlp.grammar_checker import GrammarChecker
+from app.nlp.keyword_extractor import KeywordExtractor
 from app.nlp.scorer import ExamScorer
+from app.nlp.similarity import SemanticSimilarity
+from app.nlp.tokenizer import TextPreprocessor
 
 
 class TestTextPreprocessor:
@@ -129,14 +128,23 @@ class TestSemanticSimilarity:
         )
         assert sim > 0.15  # Jaccard with 3 tokens each, some overlap
 
-    def test_spacy_similarity(self):
+    def test_embedding_similarity(self):
         ss = SemanticSimilarity()
-        sim = ss.spacy_similarity(
+        sim = ss.embedding_similarity(
             "The dog chased the cat",
             "A dog was chasing a cat"
         )
         assert 0.0 <= sim <= 1.0
         assert sim > 0.3
+
+    def test_entity_overlap_is_neutral_without_entities(self):
+        ss = SemanticSimilarity()
+        assert ss.entity_overlap("alpha beta", "gamma delta") == 0.5
+
+    def test_entity_overlap_disjoint(self):
+        ss = SemanticSimilarity()
+        sim = ss.entity_overlap("Paris is in France", "Berlin is in Germany")
+        assert sim == 0.0
 
     def test_calculate_similarity_all_methods(self):
         ss = SemanticSimilarity()
@@ -146,7 +154,7 @@ class TestSemanticSimilarity:
         )
         assert "tfidf_cosine" in result
         assert "word_overlap" in result
-        assert "spacy_vectors" in result
+        assert "embedding_similarity" in result
         assert "weighted_average" in result
         assert 0.0 <= result["weighted_average"] <= 1.0
 

@@ -1,12 +1,12 @@
 """Advanced Exam Scorer - orchestrates all NLP components."""
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Dict, List
 
-from app.nlp.tokenizer import TextPreprocessor
+from app.config import settings
+from app.nlp.grammar_checker import GrammarChecker
 from app.nlp.keyword_extractor import KeywordExtractor
 from app.nlp.similarity import SemanticSimilarity
-from app.nlp.grammar_checker import GrammarChecker
-from app.config import settings
+from app.nlp.tokenizer import TextPreprocessor
 
 
 @dataclass
@@ -53,7 +53,9 @@ class ExamScorer:
         model_keywords = self.keyword_extractor.extract_from_model_answer(model_answer)
 
         if not model_keywords:
-            return {"score": 1.0, "found": [], "missing": [], "ratio": 1.0}
+            # Nothing to match against: the keyword component is excluded from
+            # the total score instead of awarding free marks (see score_answer).
+            return {"score": 0.0, "found": [], "missing": [], "ratio": 0.0, "available": False}
 
         result = self.keyword_extractor.check_keywords_in_answer(model_keywords, student_answer)
 
@@ -62,6 +64,7 @@ class ExamScorer:
             "found": result["found"],
             "missing": result["missing"],
             "ratio": result["match_ratio"],
+            "available": True,
         }
 
     def calculate_similarity_score(
@@ -76,15 +79,12 @@ class ExamScorer:
         }
 
     def calculate_grammar_score(self, student_answer: str) -> Dict[str, any]:
-        """Score based on grammar quality."""
-        score = self.grammar_checker.calculate_grammar_score(student_answer)
-        error_count = self.grammar_checker.count_errors(student_answer)
-        suggestions = self.grammar_checker.get_suggestions(student_answer)
-
+        """Score based on grammar quality (one grammar check per answer)."""
+        issues = self.grammar_checker.check_grammar(student_answer)
         return {
-            "score": score,
-            "error_count": error_count,
-            "suggestions": suggestions,
+            "score": self.grammar_checker.calculate_grammar_score(student_answer, issues=issues),
+            "error_count": len(issues),
+            "suggestions": self.grammar_checker.summarize_issues(issues),
         }
 
     def calculate_completeness_score(
@@ -224,22 +224,32 @@ class ExamScorer:
         # 4. Completeness analysis
         completeness_score = self.calculate_completeness_score(model_answer, student_answer)
 
-        # 5. Calculate weighted total
-        weighted = (
-            keyword_result["score"] * kw
-            + similarity_result["score"] * sw
-            + grammar_result["score"] * gw
-            + completeness_score * cw
-        )
+        # 5. Calculate weighted total. When the model answer yields no
+        # keywords the keyword component cannot be judged, so its weight is
+        # redistributed over the remaining components instead of granting a
+        # free 100% (or unfairly zeroing the answer).
+        if keyword_result.get("available", True):
+            weight_total = kw + sw + gw + cw
+            weighted = (
+                keyword_result["score"] * kw
+                + similarity_result["score"] * sw
+                + grammar_result["score"] * gw
+                + completeness_score * cw
+            )
+        else:
+            weight_total = sw + gw + cw
+            weighted = (
+                similarity_result["score"] * sw
+                + grammar_result["score"] * gw
+                + completeness_score * cw
+            )
 
+        weighted = weighted / weight_total if weight_total > 0 else 0.0
         total_score = round(weighted * total_marks, 2)
 
         # Minimum relevance check: completely irrelevant answers get 0
         # If keyword match is very low AND similarity is low, answer is irrelevant
-        if keyword_result["score"] < 0.15 and similarity_result["score"] < 0.15:
-            total_score = 0.0
-        # Short answers (less than 5 words) with no keyword match = 0
-        elif len(student_answer.strip().split()) < 5 and keyword_result["score"] < 0.2:
+        if keyword_result["score"] < 0.15 and similarity_result["score"] < 0.15 or len(student_answer.strip().split()) < 5 and keyword_result["score"] < 0.2:
             total_score = 0.0
 
         # 6. Generate feedback

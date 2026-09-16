@@ -3,7 +3,7 @@ import csv
 import io
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,11 @@ def generate_pdf_report(
         PDF bytes.
     """
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-    )
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm)
@@ -73,7 +71,6 @@ def generate_pdf_report(
     elements.append(Spacer(1, 6*mm))
 
     # Score summary
-    grade_color = "#10B981" if percentage >= 75 else ("#F59E0B" if percentage >= 50 else "#EF4444")
     summary = [
         ["Total Score", f"{total_score} / {total_marks}"],
         ["Percentage", f"{percentage}%"],
@@ -150,14 +147,12 @@ def generate_exam_pdf(
     Returns:
         PDF bytes.
     """
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import mm
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-    )
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm)
@@ -286,13 +281,11 @@ def generate_exam_results_pdf(
         PDF bytes.
     """
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
-    )
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.platypus import HRFlowable, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=20*mm, rightMargin=20*mm)
@@ -300,7 +293,6 @@ def generate_exam_results_pdf(
 
     title_style = ParagraphStyle("Title2", parent=styles["Title"], fontSize=20, spaceAfter=4)
     subtitle_style = ParagraphStyle("Sub", parent=styles["Normal"], fontSize=11, alignment=TA_CENTER, textColor=colors.grey)
-    heading_style = ParagraphStyle("H2", parent=styles["Heading2"], fontSize=13, spaceAfter=4)
     body_style = ParagraphStyle("Body2", parent=styles["Normal"], fontSize=10, leading=14)
     feedback_style = ParagraphStyle("FB", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#4F46E5"), leftIndent=10)
     student_header_style = ParagraphStyle("SH", parent=styles["Heading3"], fontSize=13, textColor=colors.HexColor("#4F46E5"), spaceAfter=4)

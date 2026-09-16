@@ -1,14 +1,23 @@
-"""Advanced Grammar Checker with rule-based + language-tool fallback."""
-from typing import List, Dict, Optional
+"""Grammar checking: LanguageTool when available, plus built-in rules.
+
+The LanguageTool server URL and language come from settings so a remote
+instance can be used instead of spawning a local Java process.
+"""
+import logging
 import re
+from typing import Dict, List, Optional
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class GrammarChecker:
     """Multi-strategy grammar checking."""
 
-    def __init__(self, language: str = "en-US", remote_url: Optional[str] = None):
-        self._language = language
-        self._remote_url = remote_url
+    def __init__(self, language: Optional[str] = None, remote_url: Optional[str] = None):
+        self._language = language or settings.LANGUAGE_TOOL_LANGUAGE
+        self._remote_url = remote_url if remote_url is not None else settings.LANGUAGE_TOOL_URL
         self._tool = None
         self._use_fallback = False
 
@@ -23,7 +32,8 @@ class GrammarChecker:
                     self._tool = language_tool_python.LanguageTool(self._language, remote_server=self._remote_url)
                 else:
                     self._tool = language_tool_python.LanguageTool(self._language)
-            except Exception:
+            except Exception as exc:
+                logger.info("LanguageTool unavailable (%s) — using built-in rules only.", type(exc).__name__)
                 self._use_fallback = True
                 return None
         return self._tool
@@ -100,38 +110,42 @@ class GrammarChecker:
                 issues.extend(rule_issues)
                 return issues
             except Exception:
-                pass
+                logger.exception("LanguageTool check failed — using built-in rules only.")
 
         return self._advanced_rule_check(text)
 
     def count_errors(self, text: str) -> int:
+        """Number of grammar issues found."""
         return len(self.check_grammar(text))
 
-    def get_suggestions(self, text: str) -> List[str]:
-        issues = self.check_grammar(text)
+    @staticmethod
+    def summarize_issues(issues: List[Dict], limit: int = 5) -> List[str]:
+        """Format the first `limit` issues as short suggestions."""
         suggestions = []
-        for issue in issues[:5]:  # Top 5 only
-            s = f"[{issue.get('category', 'OTHER')}] {issue['message']}"
-            if issue["replacements"]:
-                s += f" → {', '.join(issue['replacements'][:3])}"
-            suggestions.append(s)
+        for issue in issues[:limit]:
+            text = f"[{issue.get('category', 'OTHER')}] {issue['message']}"
+            if issue.get("replacements"):
+                text += f" → {', '.join(issue['replacements'][:3])}"
+            suggestions.append(text)
         return suggestions
 
-    def calculate_grammar_score(self, text: str) -> float:
-        """Score between 0.0 and 1.0."""
-        if not text or len(text.strip()) == 0:
+    def get_suggestions(self, text: str) -> List[str]:
+        """Top-5 suggestions for a text (re-runs the check)."""
+        return self.summarize_issues(self.check_grammar(text))
+
+    def calculate_grammar_score(self, text: str, issues: Optional[List[Dict]] = None) -> float:
+        """Score between 0.0 and 1.0 (0 errors = 1.0, 10+ per 100 words = 0.0)."""
+        if not text or not text.strip():
             return 0.0
 
         word_count = len(text.split())
         if word_count == 0:
             return 0.0
 
-        error_count = self.count_errors(text)
+        error_count = len(issues) if issues is not None else self.count_errors(text)
         error_density = (error_count / word_count) * 100
 
-        # More lenient: 0 errors = 1.0, 10+ per 100 words = 0.0
-        score = max(0.0, 1.0 - (error_density / 10.0))
-        return round(score, 4)
+        return round(max(0.0, 1.0 - (error_density / 10.0)), 4)
 
     def get_corrected_text(self, text: str) -> str:
         tool = self.tool

@@ -1,6 +1,7 @@
 """Ollama LLM Feedback with template fallback."""
 import requests
 
+
 class FeedbackGenerator:
     def __init__(self, ollama_url: str = "http://localhost:11434"):
         self.ollama_url = ollama_url

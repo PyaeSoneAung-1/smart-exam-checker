@@ -1,25 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 
-from app.database import get_db
-from app.models.user import User, UserRole
-from app.models.question import Question
-from app.models.answer import StudentAnswer, Score
-from app.models.exam import Exam
-from app.models.subject import Subject
-from app.schemas.answer import AnswerSubmit, AnswerResponse, ScoreResponse, ScoreOverride, ExamSubmission
-from app.core.deps import get_current_user, get_current_student, get_current_teacher
-from app.nlp.scorer import exam_scorer
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
+
 from app.api.settings import get_scoring_weights
-from app.utils.pagination import get_pagination_params, paginate_query, PaginationParams
+from app.core.deps import get_current_student, get_current_teacher, get_current_user
+from app.database import get_db
+from app.models.answer import Score, StudentAnswer
+from app.models.exam import Exam
+from app.models.question import Question
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.nlp.scorer import exam_scorer
+from app.schemas.answer import (
+    AnswerResponse,
+    AnswerSubmit,
+    ExamSubmission,
+    ScoreOverride,
+    ScoreResponse,
+)
+from app.utils.pagination import PaginationParams, get_pagination_params, paginate_query
+from app.utils.time import utcnow
+from app.websocket import manager
 
 router = APIRouter(prefix="/answers", tags=["Answers"])
 
 
 def _score_answer(answer: StudentAnswer, question: Question, db: Session) -> Score:
     """Score a student answer using the NLP engine and save the score."""
-    # Read current scoring weights from DB
     weights = get_scoring_weights(db)
 
     result = exam_scorer.score_answer(
@@ -42,14 +51,9 @@ def _score_answer(answer: StudentAnswer, question: Question, db: Session) -> Sco
     return score
 
 
-@router.post("/submit", response_model=AnswerResponse, status_code=status.HTTP_201_CREATED)
-def submit_answer(
-    answer_data: AnswerSubmit,
-    current_user: User = Depends(get_current_student),
-    db: Session = Depends(get_db),
-):
-    """Submit an answer to a single question and get it auto-graded."""
-    question = db.query(Question).filter(Question.id == answer_data.question_id).first()
+def _load_submittable_question(db: Session, question_id: int) -> Question:
+    """Return the question if it can currently be answered, else raise."""
+    question = db.query(Question).filter(Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
@@ -61,19 +65,49 @@ def submit_answer(
     if availability_error:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=availability_error)
 
-    existing = (
+    return question
+
+
+def _existing_answer(db: Session, question_id: int, student_id: int) -> Optional[StudentAnswer]:
+    return (
         db.query(StudentAnswer)
         .filter(
-            StudentAnswer.question_id == answer_data.question_id,
-            StudentAnswer.student_id == current_user.id,
+            StudentAnswer.question_id == question_id,
+            StudentAnswer.student_id == student_id,
         )
         .first()
     )
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted an answer for this question")
+
+
+def _answer_response(answer: StudentAnswer) -> AnswerResponse:
+    return AnswerResponse(
+        id=answer.id,
+        question_id=answer.question_id,
+        student_id=answer.student_id,
+        answer_text=answer.answer_text,
+        submitted_at=answer.submitted_at,
+        score=ScoreResponse.model_validate(answer.score) if answer.score else None,
+    )
+
+
+@router.post("/submit", response_model=AnswerResponse, status_code=status.HTTP_201_CREATED)
+def submit_answer(
+    answer_data: AnswerSubmit,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    """Submit an answer to a single question and get it auto-graded."""
+    question = _load_submittable_question(db, answer_data.question_id)
+
+    if _existing_answer(db, question.id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already submitted an answer for this question",
+        )
 
     answer = StudentAnswer(
-        question_id=answer_data.question_id,
+        question_id=question.id,
         student_id=current_user.id,
         answer_text=answer_data.answer_text,
     )
@@ -81,78 +115,99 @@ def submit_answer(
     db.flush()
 
     score = _score_answer(answer, question, db)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # The unique constraint won the race against a concurrent submission.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You have already submitted an answer for this question",
+        ) from None
+
     db.refresh(answer)
 
-    return AnswerResponse(
-        id=answer.id,
-        question_id=answer.question_id,
-        student_id=answer.student_id,
-        answer_text=answer.answer_text,
-        submitted_at=answer.submitted_at,
-        score=ScoreResponse.model_validate(score),
+    background_tasks.add_task(
+        manager.notify_grade_ready,
+        current_user.id,
+        question.exam_id,
+        score.total_score,
+        float(question.marks),
     )
+
+    return _answer_response(answer)
 
 
 @router.post("/submit-exam", response_model=List[AnswerResponse], status_code=status.HTTP_201_CREATED)
 def submit_exam(
     submission: ExamSubmission,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_student),
     db: Session = Depends(get_db),
 ):
-    """Submit all answers for an exam at once."""
+    """Submit a whole exam at once — all answers are validated first, graded,
+    and saved in a single transaction."""
     if not submission.answers:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No answers provided")
 
-    responses = []
+    seen: set = set()
+    questions = []
     for answer_data in submission.answers:
-        question = db.query(Question).filter(Question.id == answer_data.question_id).first()
-        if not question:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Question {answer_data.question_id} not found")
-
-        exam = db.query(Exam).filter(Exam.id == question.exam_id).first()
-        if not exam or not exam.is_active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Exam for question {answer_data.question_id} is not active")
-
-        availability_error = exam.availability_error()
-        if availability_error:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=availability_error)
-
-        existing = (
-            db.query(StudentAnswer)
-            .filter(
-                StudentAnswer.question_id == answer_data.question_id,
-                StudentAnswer.student_id == current_user.id,
+        if answer_data.question_id in seen:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate answer for question {answer_data.question_id}",
             )
-            .first()
-        )
-        if existing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Already submitted answer for question {answer_data.question_id}")
+        seen.add(answer_data.question_id)
 
+        question = _load_submittable_question(db, answer_data.question_id)
+        if _existing_answer(db, question.id, current_user.id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Already submitted answer for question {question.id}",
+            )
+        questions.append((question, answer_data.answer_text))
+
+    responses = []
+    scored: list = []
+    for question, answer_text in questions:
         answer = StudentAnswer(
-            question_id=answer_data.question_id,
+            question_id=question.id,
             student_id=current_user.id,
-            answer_text=answer_data.answer_text,
+            answer_text=answer_text,
         )
         db.add(answer)
         db.flush()
-
         score = _score_answer(answer, question, db)
-        responses.append((answer, score))
+        responses.append(answer)
+        scored.append((answer, score, question))
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="One of these questions already has an answer from you",
+        ) from None
 
-    return [
-        AnswerResponse(
-            id=a.id,
-            question_id=a.question_id,
-            student_id=a.student_id,
-            answer_text=a.answer_text,
-            submitted_at=a.submitted_at,
-            score=ScoreResponse.model_validate(s),
+    for answer, _, _ in scored:
+        db.refresh(answer)
+
+    exam_id = questions[0][0].exam_id if questions else None
+    if exam_id is not None:
+        background_tasks.add_task(
+            manager.notify_batch_graded,
+            current_user.id,
+            exam_id,
+            [
+                {"question_id": q.id, "score": s.total_score, "marks": float(q.marks)}
+                for _, s, q in scored
+            ],
         )
-        for a, s in responses
-    ]
+
+    return [_answer_response(a) for a in responses]
 
 
 @router.get("/", response_model=dict)
@@ -164,14 +219,22 @@ def get_all_answers(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get all answers with optional filters. Teachers see only their subjects' answers."""
+    """List answers with optional filters.
+
+    Students only ever see their own answers; teachers only see answers from
+    exams in the subjects they teach; admins see everything.
+    """
     query = db.query(StudentAnswer).options(
         joinedload(StudentAnswer.score),
         joinedload(StudentAnswer.student),
         joinedload(StudentAnswer.question),
     )
 
-    # Filter by exam if provided
+    if current_user.role == UserRole.STUDENT:
+        query = query.filter(StudentAnswer.student_id == current_user.id)
+    elif student_id:
+        query = query.filter(StudentAnswer.student_id == student_id)
+
     if exam_id:
         question_ids = [q.id for q in db.query(Question).filter(Question.exam_id == exam_id).all()]
         query = query.filter(StudentAnswer.question_id.in_(question_ids))
@@ -179,32 +242,25 @@ def get_all_answers(
     if question_id:
         query = query.filter(StudentAnswer.question_id == question_id)
 
-    if student_id:
-        query = query.filter(StudentAnswer.student_id == student_id)
-
     # Teachers can only see answers for their subjects' exams
     if current_user.role == UserRole.TEACHER:
-        teacher_subject_ids = [s.id for s in db.query(Subject).filter(Subject.teacher_id == current_user.id).all()]
+        teacher_subject_ids = [
+            s.id for s in db.query(Subject).filter(Subject.teacher_id == current_user.id).all()
+        ]
         if teacher_subject_ids:
-            teacher_exam_ids = [e.id for e in db.query(Exam).filter(Exam.subject_id.in_(teacher_subject_ids)).all()]
-            teacher_question_ids = [q.id for q in db.query(Question).filter(Question.exam_id.in_(teacher_exam_ids)).all()]
+            teacher_exam_ids = [
+                e.id for e in db.query(Exam).filter(Exam.subject_id.in_(teacher_subject_ids)).all()
+            ]
+            teacher_question_ids = [
+                q.id for q in db.query(Question).filter(Question.exam_id.in_(teacher_exam_ids)).all()
+            ]
             query = query.filter(StudentAnswer.question_id.in_(teacher_question_ids))
         else:
             query = query.filter(StudentAnswer.id == -1)
 
     query = query.order_by(StudentAnswer.submitted_at.desc())
     result = paginate_query(query, db, pagination)
-    result.items = [
-        AnswerResponse(
-            id=a.id,
-            question_id=a.question_id,
-            student_id=a.student_id,
-            answer_text=a.answer_text,
-            submitted_at=a.submitted_at,
-            score=ScoreResponse.model_validate(a.score) if a.score else None,
-        ).model_dump()
-        for a in result.items
-    ]
+    result.items = [_answer_response(a).model_dump() for a in result.items]
     return result.model_dump()
 
 
@@ -228,18 +284,30 @@ def get_my_answers(
 
     query = query.order_by(StudentAnswer.submitted_at.desc())
     result = paginate_query(query, db, pagination)
-    result.items = [
-        AnswerResponse(
-            id=a.id,
-            question_id=a.question_id,
-            student_id=a.student_id,
-            answer_text=a.answer_text,
-            submitted_at=a.submitted_at,
-            score=ScoreResponse.model_validate(a.score) if a.score else None,
-        ).model_dump()
-        for a in result.items
-    ]
+    result.items = [_answer_response(a).model_dump() for a in result.items]
     return result.model_dump()
+
+
+def _require_teacher_owns_question(question_id: int, current_user: User, db: Session) -> None:
+    """Teachers may only touch answers from their own subjects."""
+    if current_user.role == UserRole.ADMIN:
+        return
+    subject_id = (
+        db.query(Exam.subject_id)
+        .join(Question, Question.exam_id == Exam.id)
+        .filter(Question.id == question_id)
+        .scalar()
+    )
+    owns = (
+        db.query(Subject.id)
+        .filter(Subject.id == subject_id, Subject.teacher_id == current_user.id)
+        .first()
+    )
+    if not owns:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access answers for this exam",
+        )
 
 
 @router.get("/question/{question_id}", response_model=dict)
@@ -254,6 +322,8 @@ def get_question_answers(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
+    _require_teacher_owns_question(question.id, current_user, db)
+
     query = (
         db.query(StudentAnswer)
         .options(joinedload(StudentAnswer.score), joinedload(StudentAnswer.student))
@@ -262,17 +332,7 @@ def get_question_answers(
     )
 
     result = paginate_query(query, db, pagination)
-    result.items = [
-        AnswerResponse(
-            id=a.id,
-            question_id=a.question_id,
-            student_id=a.student_id,
-            answer_text=a.answer_text,
-            submitted_at=a.submitted_at,
-            score=ScoreResponse.model_validate(a.score) if a.score else None,
-        ).model_dump()
-        for a in result.items
-    ]
+    result.items = [_answer_response(a).model_dump() for a in result.items]
     return result.model_dump()
 
 
@@ -288,15 +348,18 @@ def override_score(
     if not answer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found")
 
+    _require_teacher_owns_question(answer.question_id, current_user, db)
+
     score = db.query(Score).filter(Score.answer_id == answer_id).first()
     if not score:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Score not found for this answer")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Score not found for this answer"
+        )
 
     score.total_score = override_data.total_score
     score.is_overridden = True
     score.overridden_by = current_user.id
-    from datetime import datetime
-    score.overridden_at = datetime.utcnow()
+    score.overridden_at = utcnow()
 
     if override_data.feedback:
         score.feedback = override_data.feedback

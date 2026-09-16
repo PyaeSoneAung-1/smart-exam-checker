@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Float, JSON
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from app.database import Base
+from app.utils.time import utcnow
 
 
 class Question(Base):
@@ -13,7 +14,7 @@ class Question(Base):
     model_answer = Column(Text, nullable=False)
     marks = Column(Float, nullable=False, default=1.0)
     keywords = Column(JSON, nullable=True, default=list)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     exam = relationship("Exam", back_populates="questions")
     answers = relationship("StudentAnswer", back_populates="question", cascade="all, delete-orphan")

@@ -1,13 +1,19 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+import logging
+
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from app.config import settings
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-)
+logger = logging.getLogger(__name__)
+
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+
+_engine_kwargs = {"pool_pre_ping": True}
+if not _is_sqlite:
+    _engine_kwargs.update(pool_size=10, max_overflow=20)
+
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -25,28 +31,61 @@ def get_db():
         db.close()
 
 
+# Columns added after the first release. `create_all` creates missing tables
+# but never alters existing ones, so these are applied idempotently at startup
+# for databases created by an older version. New deployments get them from the
+# models (and from `alembic upgrade head`).
+_ADDED_COLUMNS = {
+    "exams": [
+        ("available_from", "ALTER TABLE exams ADD COLUMN available_from {ts}"),
+        ("available_until", "ALTER TABLE exams ADD COLUMN available_until {ts}"),
+    ],
+    "users": [
+        ("token_version", "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"),
+    ],
+}
+
+# Uniqueness enforced with an index so it can be added to existing tables.
+_ADDED_INDEXES = [
+    (
+        "student_answers",
+        "uq_answer_question_student",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_answer_question_student "
+        "ON student_answers (question_id, student_id)",
+    ),
+]
+
+
 def ensure_schema_upgrades() -> None:
-    """Idempotently add new nullable columns to existing tables.
-
-    `Base.metadata.create_all` only creates missing tables; it never alters
-    existing ones. For databases created before a model change, add the new
-    columns here so the app keeps working without manual migrations.
-    """
-    from sqlalchemy import inspect, text
-
+    """Apply lightweight, idempotent schema upgrades to an existing database."""
     timestamp_type = "TIMESTAMP" if engine.dialect.name == "postgresql" else "DATETIME"
     inspector = inspect(engine)
-    upgrades = {
-        "exams": [
-            ("available_from", f"ALTER TABLE exams ADD COLUMN available_from {timestamp_type}"),
-            ("available_until", f"ALTER TABLE exams ADD COLUMN available_until {timestamp_type}"),
-        ],
-    }
-    for table, columns in upgrades.items():
+
+    for table, columns in _ADDED_COLUMNS.items():
         if not inspector.has_table(table):
             continue
         existing = {c["name"] for c in inspector.get_columns(table)}
-        with engine.begin() as conn:
-            for col_name, ddl in columns:
-                if col_name not in existing:
-                    conn.execute(text(ddl))
+        for column_name, ddl in columns:
+            if column_name in existing:
+                continue
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl.format(ts=timestamp_type)))
+                logger.info("Schema upgrade: added %s.%s", table, column_name)
+            except Exception:  # pragma: no cover - dialect differences
+                logger.exception("Could not add %s.%s", table, column_name)
+
+    for table, index_name, ddl in _ADDED_INDEXES:
+        if not inspector.has_table(table):
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+        except Exception:
+            # Pre-existing duplicate rows block the index; report and continue
+            # rather than refusing to start.
+            logger.warning(
+                "Could not create unique index %s (existing duplicate rows?). "
+                "Remove duplicates and restart to enforce it.",
+                index_name,
+            )

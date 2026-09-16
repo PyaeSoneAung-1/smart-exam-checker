@@ -1,17 +1,23 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Float, Boolean
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
-from datetime import datetime
+
 from app.database import Base
+from app.utils.time import utcnow
 
 
 class StudentAnswer(Base):
     __tablename__ = "student_answers"
+    # One answer per student per question — enforced by the database so
+    # concurrent submissions can never create duplicates.
+    __table_args__ = (
+        UniqueConstraint("question_id", "student_id", name="uq_answer_question_student"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False)
-    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     answer_text = Column(Text, nullable=False)
-    submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at = Column(DateTime, default=utcnow, nullable=False)
 
     question = relationship("Question", back_populates="answers")
     student = relationship("User", foreign_keys=[student_id])

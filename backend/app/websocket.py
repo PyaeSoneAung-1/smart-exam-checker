@@ -1,10 +1,9 @@
 """WebSocket manager for real-time grading notifications."""
-import json
+import contextlib
 import logging
 from typing import Dict, List, Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
-from jose import JWTError, jwt
-from app.config import settings
+
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +28,8 @@ class ConnectionManager:
     def disconnect(self, user_id: int, websocket: WebSocket):
         """Remove a WebSocket connection."""
         if user_id in self.active_connections:
-            try:
+            with contextlib.suppress(ValueError):
                 self.active_connections[user_id].remove(websocket)
-            except ValueError:
-                pass
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
         logger.info(f"WebSocket disconnected: user {user_id} (total: {self.count()})")
@@ -96,14 +93,16 @@ manager = ConnectionManager()
 
 
 def _verify_ws_token(token: str) -> Optional[int]:
-    """Verify a JWT token and return user_id, or None."""
+    """Verify a JWT access token (including revocation) and return user_id."""
+    from app.core.deps import resolve_token_user
+    from app.database import SessionLocal
+
+    db = SessionLocal()
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            return None
-        return int(payload.get("sub", 0))
-    except (JWTError, ValueError, TypeError):
-        return None
+        user = resolve_token_user(token, db)
+        return user.id if user else None
+    finally:
+        db.close()
 
 
 @router.websocket("/ws/grade/{user_id}")
@@ -131,6 +130,6 @@ async def websocket_grade_endpoint(
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:
         manager.disconnect(user_id, websocket)
-    except Exception as e:
-        logger.error(f"WebSocket error for user {user_id}: {e}")
+    except Exception:
+        logger.exception("WebSocket error for user %s", user_id)
         manager.disconnect(user_id, websocket)

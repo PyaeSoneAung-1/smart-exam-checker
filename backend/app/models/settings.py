@@ -1,5 +1,6 @@
 """Settings model — simple key-value store for app configuration."""
 from sqlalchemy import Column, String, Text
+
 from app.database import Base
 
 

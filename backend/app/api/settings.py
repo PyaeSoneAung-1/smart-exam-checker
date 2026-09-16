@@ -1,16 +1,16 @@
 """Settings API — read/write app configuration stored in DB."""
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
-from pydantic import BaseModel
-from typing import Optional
 import logging
+from typing import Optional
 
-from app.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
+
 from app.core.deps import get_current_user
-from app.models.user import User
+from app.database import get_db
+from app.models.answer import Score, StudentAnswer
 from app.models.settings import AppSetting
-from app.models.answer import StudentAnswer, Score
-from app.models.question import Question
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -59,17 +59,24 @@ def get_setting(db: Session, key: str) -> str:
 
 
 @router.get("")
-def get_all_settings(db: Session = Depends(get_db)):
-    """Get all settings with defaults."""
+def get_all_settings(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all settings with defaults (authenticated users only)."""
     result = {}
-    for key, default in DEFAULTS.items():
+    for key in DEFAULTS:
         result[key] = get_setting(db, key)
     return result
 
 
 @router.get("/{key}")
-def get_setting_by_key(key: str, db: Session = Depends(get_db)):
-    """Get a single setting value."""
+def get_setting_by_key(
+    key: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a single setting value (authenticated users only)."""
     value = get_setting(db, key)
     if not value and key not in DEFAULTS:
         raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
@@ -219,9 +226,7 @@ def rescore_all_answers(
             total = round(weighted * marks, 2)
 
             # Keep the original scorer's zero-out rules
-            if k < 0.15 and s < 0.15:
-                total = 0.0
-            elif len(answer.answer_text.strip().split()) < 5 and k < 0.2:
+            if k < 0.15 and s < 0.15 or len(answer.answer_text.strip().split()) < 5 and k < 0.2:
                 total = 0.0
 
             # Fast feedback regeneration: assessment band from the new total,

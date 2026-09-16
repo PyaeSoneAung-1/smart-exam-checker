@@ -1,17 +1,16 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
+from app.core.deps import get_current_teacher, get_current_user
 from app.database import get_db
-from app.models.user import User, UserRole
-from app.models.subject import Subject
+from app.models.answer import StudentAnswer
 from app.models.exam import Exam
 from app.models.question import Question
-from app.models.answer import StudentAnswer, Score
-from app.schemas.subject import SubjectCreate, SubjectUpdate, SubjectResponse
-from app.core.deps import get_current_user, get_current_teacher, get_current_admin
-from typing import Optional
-from app.utils.pagination import get_pagination_params, paginate_query, PaginationParams
+from app.models.subject import Subject
+from app.models.user import User, UserRole
+from app.schemas.subject import SubjectCreate, SubjectUpdate
+from app.utils.pagination import PaginationParams, get_pagination_params, paginate_query
 
 router = APIRouter(prefix="/subjects", tags=["Subjects"])
 

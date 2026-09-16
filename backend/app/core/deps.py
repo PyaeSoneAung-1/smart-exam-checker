@@ -1,13 +1,38 @@
+from typing import Annotated, Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from typing import Annotated
 
+from app.core.security import decode_token
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.core.security import decode_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+def resolve_token_user(token: str, db: Session) -> Optional[User]:
+    """Return the user for a valid *access* token, else None.
+
+    Also enforces the per-user `token_version`, so incrementing it (logout or
+    password change) immediately invalidates every previously issued token.
+    """
+    payload = decode_token(token)
+    if payload is None or payload.get("type") != "access":
+        return None
+
+    subject = payload.get("sub")
+    if subject is None:
+        return None
+
+    user = db.query(User).filter(User.id == int(subject)).first()
+    if user is None or not user.is_active:
+        return None
+
+    if int(payload.get("ver", 0)) != int(user.token_version or 0):
+        return None
+
+    return user
 
 
 async def get_current_user(
@@ -21,27 +46,9 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    payload = decode_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    token_type = payload.get("type")
-    if token_type != "access":
-        raise credentials_exception
-
-    user_id: int = payload.get("sub")
-    if user_id is None:
-        raise credentials_exception
-
-    user = db.query(User).filter(User.id == user_id).first()
+    user = resolve_token_user(token, db)
     if user is None:
         raise credentials_exception
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user account",
-        )
 
     return user
 

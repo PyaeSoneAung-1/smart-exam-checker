@@ -345,7 +345,8 @@ class AIDetector:
 
     def _calc_list_patterns(self, text: str) -> float:
         lines = text.split('\n')
-        list_lines = sum(1 for l in lines if re.match(r'^\s*[\d]+[\.\)]\s|^\s*[-*•]\s', l.strip()))
+        pattern = r'^\s*[\d]+[\.\)]\s|^\s*[-*•]\s'
+        list_lines = sum(1 for line in lines if re.match(pattern, line.strip()))
         if len(lines) < 3:
             return 0.0
         return min(1.0, list_lines / len(lines) * 2)
