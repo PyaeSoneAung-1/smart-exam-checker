@@ -8,6 +8,10 @@ os.environ.setdefault("SEED_DEMO_DATA", "false")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production-0123456789abcdef")
 
+# Never spawn the Java LanguageTool server from the test suite: the result would
+# depend on whether a JVM is installed, and its shutdown is noisy.
+os.environ.setdefault("LANGUAGE_TOOL_ENABLED", "false")
+
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
