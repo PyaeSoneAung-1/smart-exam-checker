@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, getRoleColor, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
-import api, { asApiError } from "@/lib/api";
+import api, { asApiError, fileUrl } from "@/lib/api";
 
 export default function StudentProfilePage() {
-  const { user, fetchUser } = useAuthStore();
+  const { user, fetchUser, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
@@ -34,8 +34,12 @@ export default function StudentProfilePage() {
         if (!currentPw) { toast.error("Current password is required"); setIsLoading(false); return; }
         if (newPw.length < 6) { toast.error("Password must be at least 6 characters"); setIsLoading(false); return; }
         await api.put("/auth/change-password", { current_password: currentPw, new_password: newPw });
-        setCurrentPw(""); setNewPw(""); setConfirmPw("");
-        toast.success("Password changed successfully!");
+        // The backend invalidates every token on password change, so sign the
+        // user out and send them back to the login screen.
+        toast.success("Password changed. Please sign in again.");
+        logout();
+        window.location.href = "/login";
+        return;
       }
       if (name !== user.name || email !== user.email) {
         toast.info("Name/email updates require admin assistance");
@@ -59,6 +63,9 @@ export default function StudentProfilePage() {
         <Card>
           <CardContent className="flex flex-col items-center p-6">
             <Avatar className="h-24 w-24">
+              {user.profile_photo && (
+                <AvatarImage src={fileUrl(user.profile_photo)} alt={user.name} />
+              )}
               <AvatarFallback className="bg-blue-600 text-2xl text-white">
                 {getInitials(user.name)}
               </AvatarFallback>

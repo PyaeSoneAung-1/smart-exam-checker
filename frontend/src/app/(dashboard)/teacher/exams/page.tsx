@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { examsApi, subjectsApi, asApiError } from "@/lib/api";
+import { useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import type { Exam, Subject } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,44 +17,88 @@ import { FileText, Plus, Eye, Trash2, Search, Clock, Hash, CalendarDays } from "
 import { toast } from "sonner";
 import { formatUtcDateTime } from "@/lib/utils";
 
+/** Load this teacher's exams (optionally one subject) and their subjects. */
+async function loadExamsData(subjectId: number | undefined, userId?: number) {
+  const [examRes, subRes] = await Promise.all([
+    // Filter server-side instead of downloading every exam and sifting here.
+    examsApi.getAll({ subject_id: subjectId, size: 100 }),
+    subjectsApi.getAll({ size: 100 }),
+  ]);
+  const allExams = examRes.data.items || [];
+  const allSubjects = subRes.data.items || [];
+
+  // Filter subjects to only those belonging to this teacher
+  const mySubjects = allSubjects.filter((s) => s.teacher_id === userId);
+  const mySubjectIds = new Set(mySubjects.map((s) => s.id));
+
+  // Filter exams to only those for this teacher's subjects
+  const myExams = allExams.filter((e) => mySubjectIds.has(e.subject_id));
+
+  return {
+    exams: myExams.length > 0 ? myExams : allExams,
+    subjects: mySubjects.length > 0 ? mySubjects : allSubjects,
+  };
+}
+
+/**
+ * Route entry. Reads `?subject_id=` (linked from /teacher/subjects), so the
+ * client component using `useSearchParams` is wrapped in Suspense.
+ */
 export default function TeacherExamsPage() {
+  return (
+    <Suspense fallback={<p className="text-center py-12 text-muted-foreground">Loading...</p>}>
+      <TeacherExamsContent />
+    </Suspense>
+  );
+}
+
+function TeacherExamsContent() {
+  const searchParams = useSearchParams();
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // Initial subject filter comes from the ?subject_id= link on /teacher/subjects.
+  const [subjectFilter, setSubjectFilter] = useState<string>(searchParams.get("subject_id") ?? "all");
   const [form, setForm] = useState({ title: "", description: "", subject_id: "", total_marks: "20", time_limit_minutes: "30", available_from: "", available_until: "" });
 
   const user = useAuthStore((s) => s.user);
 
-  const fetchData = useCallback(async () => {
+  const subjectId = subjectFilter !== "all" ? Number(subjectFilter) : undefined;
+
+  // Refresh helper for the create/delete handlers.
+  const fetchData = async () => {
     try {
-      const [examRes, subRes] = await Promise.all([
-        examsApi.getAll({ limit: 500 }),
-        subjectsApi.getAll({ limit: 500 }),
-      ]);
-      // Backend already filters teacher exams, but also filter on frontend as backup
-      const allExams = examRes.data.items || [];
-      const allSubjects = subRes.data.items || [];
-
-      // Filter subjects to only those belonging to this teacher
-      const mySubjects = allSubjects.filter((s) => s.teacher_id === user?.id);
-      const mySubjectIds = new Set(mySubjects.map((s) => s.id));
-
-      // Filter exams to only those for this teacher's subjects
-      const myExams = allExams.filter((e) => mySubjectIds.has(e.subject_id));
-
-      setExams(myExams.length > 0 ? myExams : allExams);
-      setSubjects(mySubjects.length > 0 ? mySubjects : allSubjects);
+      const data = await loadExamsData(subjectId, user?.id);
+      setExams(data.exams);
+      setSubjects(data.subjects);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load data");
-    } finally {
-      setLoading(false);
     }
-  }, [user?.id]);
+  };
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    let cancelled = false;
+    loadExamsData(subjectId, user?.id)
+      .then((data) => {
+        if (cancelled) return;
+        setExams(data.exams);
+        setSubjects(data.subjects);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        toast.error("Failed to load data");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, subjectId]);
 
   const handleCreate = async () => {
     if (!form.title || !form.subject_id) {
@@ -167,15 +212,39 @@ export default function TeacherExamsPage() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search exams..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search exams..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="w-64">
+          <Select
+            value={subjectFilter}
+            onValueChange={(v) => setSubjectFilter(v ?? "all")}
+            // `items` lets the trigger show the subject *name* for the value
+            // carried in by ?subject_id= (popup items are only mounted when open).
+            items={[
+              { value: "all", label: "All Subjects" },
+              ...subjects.map((s) => ({ value: String(s.id), label: s.name })),
+            ]}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by subject..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subjects</SelectItem>
+              {subjects.map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Stats */}
@@ -206,7 +275,7 @@ export default function TeacherExamsPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">{search ? "No exams match your search" : "No exams yet. Create your first exam!"}</p>
+            <p className="text-muted-foreground">{search || subjectFilter !== "all" ? "No exams match your filters" : "No exams yet. Create your first exam!"}</p>
           </CardContent>
         </Card>
       ) : (

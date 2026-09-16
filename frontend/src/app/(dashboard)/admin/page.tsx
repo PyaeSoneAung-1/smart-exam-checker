@@ -49,7 +49,16 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const d = data!;
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+        <p className="font-medium">Could not load the admin dashboard</p>
+        <p className="text-sm text-muted-foreground">Please refresh the page to try again.</p>
+      </div>
+    );
+  }
+
+  const d = data;
   const adminCount = Math.max(0, d.total_users - d.total_students - d.total_teachers);
   const breakdown = [
     { name: "Students", value: d.total_students },

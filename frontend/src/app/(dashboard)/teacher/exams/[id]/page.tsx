@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { examsApi, questionsApi } from "@/lib/api";
@@ -16,6 +16,15 @@ import {
 import { ArrowLeft, Plus, Trash2, FileText, ChevronDown, ChevronUp, Pencil, CalendarDays } from "lucide-react";
 import { toast } from "sonner";
 import { formatUtcDateTime, toLocalInputValue } from "@/lib/utils";
+
+/** Load one exam plus its questions (no React state — shared by the effect and refreshes). */
+async function loadExamDetail(id: number): Promise<{ exam: Exam; questions: Question[] }> {
+  const [examRes, qRes] = await Promise.all([
+    examsApi.getById(id),
+    questionsApi.getAll({ exam_id: id, size: 100 }),
+  ]);
+  return { exam: examRes.data, questions: qRes.data.items || [] };
+}
 
 export default function TeacherExamDetailPage() {
   const { id } = useParams();
@@ -35,23 +44,37 @@ export default function TeacherExamDetailPage() {
     available_until: "",
   });
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     try {
-      const [examRes, qRes] = await Promise.all([
-        examsApi.getById(Number(id)),
-        questionsApi.getAll({ exam_id: Number(id) }),
-      ]);
-      setExam(examRes.data);
-      setQuestions(qRes.data.items || []);
+      const data = await loadExamDetail(Number(id));
+      setExam(data.exam);
+      setQuestions(data.questions);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load exam");
-    } finally {
-      setLoading(false);
     }
-  }, [id]);
+  };
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    let cancelled = false;
+    loadExamDetail(Number(id))
+      .then((data) => {
+        if (cancelled) return;
+        setExam(data.exam);
+        setQuestions(data.questions);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        toast.error("Failed to load exam");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const handleDeleteQuestion = async (q: Question) => {
     if (!confirm("Delete this question?")) return;

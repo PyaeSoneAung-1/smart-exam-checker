@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { formatUtcDateTime } from "@/lib/utils";
+import { cn, formatUtcDateTime } from "@/lib/utils";
 
 export default function TakeExamPage() {
   return (
@@ -59,7 +59,7 @@ function ExamContent() {
       try {
         const examRes = await examsApi.getById(Number(id));
         setExam(examRes.data);
-        const qRes = await questionsApi.getAll({ exam_id: Number(id) });
+        const qRes = await questionsApi.getAll({ exam_id: Number(id), size: 100 });
         const qs = qRes.data.items || [];
         setQuestions(qs);
         const init: Record<number, string> = {};
@@ -93,20 +93,30 @@ function ExamContent() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [answers]);
 
-  // Prevent Next.js route changes
+  // Warn before leaving with unsaved answers. Instead of mutating router.push,
+  // intercept link clicks in the capture phase so every in-app navigation
+  // (including <Link>) is covered.
+  const dirtyRef = useRef(false);
+
   useEffect(() => {
-    const originalPush = router.push;
-    // @ts-expect-next-line - intercepting router.push
-    router.push = (url: string) => {
-      if (!submittedRef.current && Object.values(answers).some((a) => a.trim())) {
-        setPendingNavigation(url);
-        setShowLeaveConfirm(true);
-        return Promise.resolve(false);
-      }
-      return originalPush(url);
+    dirtyRef.current = Object.values(answers).some((a) => a.trim()) && !submitted;
+  }, [answers, submitted]);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (!dirtyRef.current || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest?.("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (!href) return;
+      if (/^(https?:)?\/\//.test(href) || anchor?.getAttribute("target") === "_blank") return;
+      event.preventDefault();
+      setPendingNavigation(href);
+      setShowLeaveConfirm(true);
     };
-    return () => { router.push = originalPush; };
-  }, [router, answers]);
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (submitting || submittedRef.current) return;
@@ -197,7 +207,7 @@ function ExamContent() {
         </Card>
 
         {results.map((r: Answer, idx: number) => (
-          <Card key={idx}>
+          <Card key={r.id}>
             <CardHeader>
               <CardTitle className="text-base">Q{idx + 1}: {questions[idx]?.question_text}</CardTitle>
             </CardHeader>
@@ -362,8 +372,4 @@ function ExamContent() {
       </div>
     </div>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
 }

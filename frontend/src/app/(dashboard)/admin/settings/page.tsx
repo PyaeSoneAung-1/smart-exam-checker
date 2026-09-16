@@ -8,6 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { dashboardApi, settingsApi } from "@/lib/api";
+import {
+  DEFAULT_THRESHOLDS,
+  DEFAULT_WEIGHTS,
+  parseNumberOr,
+  type ScoringThresholds,
+  type ScoringWeights,
+} from "@/lib/utils";
 import type { AdminDashboard } from "@/types";
 import { toast } from "sonner";
 import {
@@ -15,21 +22,7 @@ import {
   Save, Loader2, RotateCcw, Shield, Scale, AlertTriangle,
 } from "lucide-react";
 
-interface ScoringWeights {
-  keyword: number;
-  semantic: number;
-  grammar: number;
-  completeness: number;
-}
-
-interface Thresholds {
-  plagiarism: number;
-  low_score: number;
-  pass_percentage: number;
-}
-
-const DEFAULT_WEIGHTS: ScoringWeights = { keyword: 30, semantic: 25, grammar: 15, completeness: 30 };
-const DEFAULT_THRESHOLDS: Thresholds = { plagiarism: 60, low_score: 30, pass_percentage: 40 };
+type Thresholds = ScoringThresholds;
 
 export default function AdminSettingsPage() {
   const [stats, setStats] = useState<AdminDashboard | null>(null);
@@ -51,35 +44,44 @@ export default function AdminSettingsPage() {
     };
     fetchInfo();
 
-    // Load scoring weights from backend API (with localStorage fallback)
+    // Load scoring weights from backend API (with localStorage fallback).
+    // Defaults live in @/lib/utils so this page, /admin/nlp and the backend
+    // `DEFAULTS` can never disagree — and parseNumberOr keeps a real 0.
     settingsApi.getAll().then((res) => {
       const data = res.data;
-      // Load thresholds
       setThresholds({
-        plagiarism: parseInt(data.plagiarism) || 60,
-        low_score: parseInt(data.low_score) || 30,
-        pass_percentage: parseInt(data.pass_percentage) || 40,
+        plagiarism: parseNumberOr(data.plagiarism, DEFAULT_THRESHOLDS.plagiarism),
+        low_score: parseNumberOr(data.low_score, DEFAULT_THRESHOLDS.low_score),
+        pass_percentage: parseNumberOr(data.pass_percentage, DEFAULT_THRESHOLDS.pass_percentage),
       });
-      // Load scoring weights from backend
-      const kw = parseInt(data.keyword_weight);
-      const sw = parseInt(data.similarity_weight);
-      const gw = parseInt(data.grammar_weight);
-      const cw = parseInt(data.completeness_weight);
-      if (kw || sw || gw || cw) {
-        setWeights({
-          keyword: kw || 30,
-          semantic: sw || 40,
-          grammar: gw || 15,
-          completeness: cw || 15,
-        });
-      }
+      setWeights({
+        keyword: parseNumberOr(data.keyword_weight, DEFAULT_WEIGHTS.keyword),
+        semantic: parseNumberOr(data.similarity_weight, DEFAULT_WEIGHTS.semantic),
+        grammar: parseNumberOr(data.grammar_weight, DEFAULT_WEIGHTS.grammar),
+        completeness: parseNumberOr(data.completeness_weight, DEFAULT_WEIGHTS.completeness),
+      });
     }).catch(() => {
       // Fallback to localStorage
       try {
         const saved = localStorage.getItem("exam-thresholds");
-        if (saved) setThresholds(JSON.parse(saved));
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<Thresholds>;
+          setThresholds({
+            plagiarism: parseNumberOr(parsed.plagiarism, DEFAULT_THRESHOLDS.plagiarism),
+            low_score: parseNumberOr(parsed.low_score, DEFAULT_THRESHOLDS.low_score),
+            pass_percentage: parseNumberOr(parsed.pass_percentage, DEFAULT_THRESHOLDS.pass_percentage),
+          });
+        }
         const savedWeights = localStorage.getItem("exam-scoring-weights");
-        if (savedWeights) setWeights(JSON.parse(savedWeights));
+        if (savedWeights) {
+          const parsed = JSON.parse(savedWeights) as Partial<ScoringWeights>;
+          setWeights({
+            keyword: parseNumberOr(parsed.keyword, DEFAULT_WEIGHTS.keyword),
+            semantic: parseNumberOr(parsed.semantic, DEFAULT_WEIGHTS.semantic),
+            grammar: parseNumberOr(parsed.grammar, DEFAULT_WEIGHTS.grammar),
+            completeness: parseNumberOr(parsed.completeness, DEFAULT_WEIGHTS.completeness),
+          });
+        }
       } catch {}
     });
   }, []);
@@ -200,7 +202,7 @@ export default function AdminSettingsPage() {
                     min={0}
                     max={100}
                     value={weights[key]}
-                    onChange={(e) => setWeights({ ...weights, [key]: parseInt(e.target.value) || 0 })}
+                    onChange={(e) => setWeights({ ...weights, [key]: parseNumberOr(e.target.value, 0) })}
                     className="w-24"
                   />
                   <span className="text-sm text-muted-foreground">%</span>
@@ -242,7 +244,7 @@ export default function AdminSettingsPage() {
                   min={0}
                   max={100}
                   value={thresholds.plagiarism}
-                  onChange={(e) => setThresholds({ ...thresholds, plagiarism: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setThresholds({ ...thresholds, plagiarism: parseNumberOr(e.target.value, 0) })}
                   className="w-24"
                 />
                 <span className="text-sm text-muted-foreground">%</span>
@@ -260,7 +262,7 @@ export default function AdminSettingsPage() {
                   min={0}
                   max={100}
                   value={thresholds.low_score}
-                  onChange={(e) => setThresholds({ ...thresholds, low_score: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setThresholds({ ...thresholds, low_score: parseNumberOr(e.target.value, 0) })}
                   className="w-24"
                 />
                 <span className="text-sm text-muted-foreground">%</span>
@@ -278,7 +280,7 @@ export default function AdminSettingsPage() {
                   min={0}
                   max={100}
                   value={thresholds.pass_percentage}
-                  onChange={(e) => setThresholds({ ...thresholds, pass_percentage: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setThresholds({ ...thresholds, pass_percentage: parseNumberOr(e.target.value, 0) })}
                   className="w-24"
                 />
                 <span className="text-sm text-muted-foreground">%</span>

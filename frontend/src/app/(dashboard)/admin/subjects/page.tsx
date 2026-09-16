@@ -30,10 +30,11 @@ export default function AdminSubjectsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", description: "", teacher_id: "" });
 
+  // Refresh helper used by the create/delete handlers (loading state is set by
+  // the caller, so nothing is set synchronously inside the effect below).
   const fetchSubjects = async () => {
-    setLoading(true);
     try {
-      const res = await subjectsApi.getAll({ limit: 500 });
+      const res = await subjectsApi.getAll({ size: 100 });
       setSubjects(res.data.items || []);
     } catch (err) {
       console.error(err);
@@ -43,18 +44,28 @@ export default function AdminSubjectsPage() {
     }
   };
 
-  const fetchTeachers = async () => {
-    try {
-      const res = await teachersApi.getAll();
-      setTeachers(res.data.items || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
-    fetchSubjects();
-    fetchTeachers();
+    let cancelled = false;
+    Promise.all([
+      subjectsApi.getAll({ size: 100 }),
+      teachersApi.getAll().catch(() => null),
+    ])
+      .then(([subjectsRes, teachersRes]) => {
+        if (cancelled) return;
+        setSubjects(subjectsRes.data.items || []);
+        if (teachersRes) setTeachers(teachersRes.data.items || []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        toast.error("Failed to load subjects");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleCreate = async () => {

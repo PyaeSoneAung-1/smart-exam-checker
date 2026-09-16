@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import api, { answersApi, questionsApi, asApiError } from "@/lib/api";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import api, { answersApi, questionsApi, asApiError, MAX_PAGE_SIZE } from "@/lib/api";
 import type { Answer, Question } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,21 @@ import { ArrowLeft, Save, AlertTriangle, Loader2, CheckCircle2, Tag, Sparkles, M
 import Link from "next/link";
 
 export default function OverrideScorePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
+      <OverrideScoreContent />
+    </Suspense>
+  );
+}
+
+function OverrideScoreContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const answerId = Number(params?.answerId);
+  // The marks list links here with `?question_id=`; knowing the question lets us
+  // fetch just that question's answers instead of scanning every answer.
+  const questionId = Number(searchParams.get("question_id")) || null;
 
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -44,43 +56,59 @@ export default function OverrideScorePage() {
     }
   };
 
+  // Direct URL without the question context (or a bad id): we refuse to download
+  // every answer just to find one, so ask the user to come in via the list.
+  const invalidTarget = !Number.isFinite(answerId) || !questionId;
+
   useEffect(() => {
-    if (!answerId) return;
+    if (invalidTarget || !questionId) return;
+
+    let cancelled = false;
+    const targetQuestionId = questionId;
 
     const fetchData = async () => {
       try {
-        // Fetch all answers to find this one
-        const answersRes = await answersApi.getAllAnswers({ limit: 10000 });
-        const allAnswers: Answer[] = answersRes.data.items || [];
-        const found = allAnswers.find(a => a.id === answerId);
+        // Targeted request: only the answers for this question (paged).
+        let found: Answer | undefined;
+        for (let page = 1; page <= 5; page++) {
+          const res = await answersApi.getByQuestion(targetQuestionId, { page, size: MAX_PAGE_SIZE });
+          const batch: Answer[] = res.data.items ?? [];
+          found = batch.find((a) => a.id === answerId);
+          if (found || batch.length < MAX_PAGE_SIZE) break;
+        }
 
         if (!found) {
           toast.error("Answer not found");
           router.push("/teacher/marks");
           return;
         }
+        if (cancelled) return;
 
         setAnswer(found);
         setNewScore(found.score ? String(Math.round(found.score.total_score * 100) / 100) : "0");
 
         // Fetch question details
-        if (found.question_id) {
-          try {
-            const qRes = await questionsApi.getById(found.question_id);
-            setQuestion(qRes.data);
-          } catch {
-            // Question fetch failed, use what we have
-          }
+        try {
+          const qRes = await questionsApi.getById(targetQuestionId);
+          if (!cancelled) setQuestion(qRes.data);
+        } catch {
+          // Question fetch failed, use what we have
         }
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to load answer details");
+        if (!cancelled) {
+          console.error(err);
+          toast.error("Failed to load answer details");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchData();
-  }, [answerId, router]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [answerId, questionId, invalidTarget, router]);
 
   const handleOverride = async () => {
     const score = Number(newScore);
@@ -116,10 +144,14 @@ export default function OverrideScorePage() {
     );
   }
 
-  if (!answer) {
+  if (invalidTarget || !answer) {
     return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">Answer not found</p>
+      <div className="text-center py-12 space-y-2">
+        <p className="text-muted-foreground">
+          {invalidTarget
+            ? "This answer could not be located. Open it from the Student Marks list."
+            : "Answer not found"}
+        </p>
         <Link href="/teacher/marks"><Button className="mt-4">Back to Marks</Button></Link>
       </div>
     );

@@ -13,13 +13,22 @@ import { toast } from "sonner";
 interface PlagiarismPair {
   similarity: number;
   flagged: boolean;
+  semantic_review?: boolean;
+  method?: string;
+  semantic_similarity?: number | null;
   question_text?: string;
   [key: string]: unknown;
 }
 
 interface PlagiarismResult {
   pairs: PlagiarismPair[];
-  summary?: { total_pairs: number; flagged_pairs: number; max_similarity: number };
+  summary?: {
+    total_pairs: number;
+    flagged_pairs: number;
+    review_pairs?: number;
+    max_similarity: number;
+    max_semantic_similarity?: number;
+  };
 }
 
 export default function TeacherPlagiarismPage() {
@@ -52,7 +61,11 @@ export default function TeacherPlagiarismPage() {
     }
   };
 
-  const pairs = result?.pairs || [];
+  // Copies first, then paraphrase-review candidates, then the rest.
+  const pairs = [...(result?.pairs || [])].sort((a, b) => {
+    const rank = (p: PlagiarismPair) => (p.flagged ? 0 : p.semantic_review ? 1 : 2);
+    return rank(a) - rank(b) || (b.similarity || 0) - (a.similarity || 0);
+  });
   const nameMap: Record<number, string> = {};
   students.forEach((s) => { nameMap[s.id] = s.name; });
 
@@ -182,9 +195,21 @@ export default function TeacherPlagiarismPage() {
                           Q: {pair.question_text}
                         </span>
                       )}
+                      {pair.semantic_review && !pair.flagged && (
+                        <Badge variant="outline" className="ml-auto border-amber-400 text-amber-700">
+                          Possible paraphrase — review
+                        </Badge>
+                      )}
                       {pair.similarity !== undefined && (
-                        <Badge className={`ml-auto ${getSimilarityColor(pair.similarity)}`}>
-                          {(pair.similarity * 100).toFixed(1)}% similar
+                        <Badge
+                          className={`${pair.semantic_review && !pair.flagged ? "" : "ml-auto"} ${getSimilarityColor(pair.similarity)}`}
+                          title={
+                            pair.semantic_similarity != null
+                              ? `Semantic similarity: ${(pair.semantic_similarity * 100).toFixed(1)}%`
+                              : undefined
+                          }
+                        >
+                          {(pair.similarity * 100).toFixed(1)}% lexical
                         </Badge>
                       )}
                     </div>

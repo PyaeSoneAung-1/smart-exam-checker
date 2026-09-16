@@ -28,8 +28,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Allow tunnel/dev origins (cloudflare, ngrok, etc.)
+  // Allow local + tunnel/dev origins (cloudflare, ngrok, etc.) so `next dev`
+  // does not warn about cross-origin requests.
   allowedDevOrigins: [
+    "localhost",
+    "127.0.0.1",
     "*.trycloudflare.com",
     "*.ngrok-free.app",
     "*.ngrok.io",

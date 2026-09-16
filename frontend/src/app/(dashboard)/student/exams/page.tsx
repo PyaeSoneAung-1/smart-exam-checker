@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { examsApi, answersApi, questionsApi } from "@/lib/api";
-import type { Exam, Answer } from "@/types";
+import { examsApi } from "@/lib/api";
+import { fetchMyResultsByExam } from "@/lib/exam-results";
+import type { Exam } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,43 +19,37 @@ export default function StudentExamsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchExams = async () => {
       try {
-        const examRes = await examsApi.getAll({ limit: 500 });
+        const examRes = await examsApi.getAll({ size: 100 });
         const examList: Exam[] = examRes.data.items || [];
+        if (cancelled) return;
         setExams(examList);
 
-        try {
-          const answerRes = await answersApi.getMyAnswers({ limit: 10000 });
-          const myAnswers: Answer[] = answerRes.data.items || [];
+        // Targeted per-exam query instead of pulling every answer the student
+        // ever submitted plus every question in the system.
+        const byExam = await fetchMyResultsByExam(examList);
+        if (cancelled) return;
 
-          const qRes = await questionsApi.getAll({ limit: 500 });
-          const questions = qRes.data.items || [];
-          const questionToExam: Record<number, number> = {};
-          questions.forEach((q) => { questionToExam[q.id] = q.exam_id; });
-
-          const completedIds = new Set<number>();
-          let totalScore = 0;
-
-          for (const answer of myAnswers) {
-            const examId = questionToExam[answer.question_id];
-            if (examId) completedIds.add(examId);
-            if (answer.score) totalScore += answer.score.total_score;
-          }
-
-          setCompletedExamIds(completedIds);
-          setMyTotalScore(Math.round(totalScore * 100) / 100);
-        } catch {
-          // New student - no answers yet
-        }
+        setCompletedExamIds(new Set(byExam.keys()));
+        const totalScore = [...byExam.values()].reduce((sum, r) => sum + r.totalScore, 0);
+        setMyTotalScore(Math.round(totalScore * 100) / 100);
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to load exams");
+        if (!cancelled) {
+          console.error(err);
+          toast.error("Failed to load exams");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchExams();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -9,7 +9,8 @@ export default function DashLayout({ children }: { children: React.ReactNode }) 
   const { user, fetchUser, token, _hydrated } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
+  // Derived, not state: we are "ready" as soon as a user object is available.
+  const ready = Boolean(user);
 
   useEffect(() => {
     if (!_hydrated) return;
@@ -17,13 +18,9 @@ export default function DashLayout({ children }: { children: React.ReactNode }) 
       router.push("/login");
       return;
     }
-    // If user is already in store, we're ready immediately
-    if (user) {
-      setReady(true);
-      return;
-    }
-    // Fetch user but don't block rendering on failure
-    fetchUser().finally(() => setReady(true));
+    // Fetch the profile if it is not in the store yet; rendering is not blocked
+    // on failure.
+    if (!user) void fetchUser();
   }, [_hydrated, token, user, router, fetchUser]); // Only run on hydration/token/user change
 
   // Role guard — only redirect when we have a confirmed user

@@ -90,10 +90,6 @@ export interface Answer {
   student?: User;
 }
 
-export interface ExamSubmission {
-  answers: { question_id: number; answer_text: string }[];
-}
-
 export interface ScoreOverride {
   total_score: number;
   feedback: string;
@@ -135,37 +131,4 @@ export interface AdminDashboard {
   total_submissions: number;
   average_system_score: number;
   recent_registrations: number;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-}
-
-export interface ApiResponse<T> {
-  data: T;
-  message?: string;
-}
-
-export interface PlagiarismResult {
-  answer_idx_1: number;
-  answer_idx_2: number;
-  similarity: number;
-  flagged: boolean;
-  question_id?: number;
-  question_text?: string;
-  student_1_id?: number;
-  student_2_id?: number;
-}
-
-export interface AIDetectionResult {
-  ai_probability: number;
-  perplexity: number;
-  burstiness: number;
-  vocabulary_richness: number;
-  ai_phrases_found: string[];
-  flagged: boolean;
 }

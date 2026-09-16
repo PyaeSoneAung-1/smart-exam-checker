@@ -15,13 +15,12 @@ const eslintConfig = defineConfig([
   ]),
   {
     rules: {
-      // New React Compiler-era hooks rules that flag the standard
-      // async-fetch-in-effect pattern (setLoading(true) inside fetchData)
-      // and the router.push interception used in the student exam page.
-      // Both patterns are intentional here; keeping them enabled produces
-      // false positives on every data-fetching page.
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/immutability": "off",
+      // React Compiler-era hooks rules. These used to be disabled because every
+      // data-fetching page set state inside the effect body. The fetches now
+      // deliver state through promise callbacks (or inline async IIFEs), so the
+      // rules stay ON — no blanket exception, no per-file escape hatch.
+      "react-hooks/set-state-in-effect": "error",
+      "react-hooks/immutability": "error",
     },
   },
 ]);

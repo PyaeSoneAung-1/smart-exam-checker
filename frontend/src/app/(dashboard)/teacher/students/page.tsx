@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usersApi, answersApi } from "@/lib/api";
+import { usersApi, answersApi, fetchAllPages } from "@/lib/api";
 import type { User, Answer } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,14 +26,15 @@ export default function TeacherStudentsPage() {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        // Fetch students and answers in parallel
+        // Students and answers are both walked in pages of 100 (stopping on a
+        // short page) rather than requesting 10 000 rows at once.
         const [studentsRes, answersRes] = await Promise.all([
-          usersApi.getAll({ role: "student", limit: 500 }),
-          answersApi.getAllAnswers({ limit: 10000 }),
+          fetchAllPages<User>((page, size) => usersApi.getAll({ role: "student", page, size })),
+          fetchAllPages<Answer>((page, size) => answersApi.getAllAnswers({ page, size })),
         ]);
 
-        const studentList: User[] = studentsRes.data.items || [];
-        const answers: Answer[] = answersRes.data.items || [];
+        const studentList: User[] = studentsRes.items;
+        const answers: Answer[] = answersRes.items;
 
         // Aggregate scores by student
         const scoreMap: Record<number, { total_score: number; examIds: Set<number> }> = {};

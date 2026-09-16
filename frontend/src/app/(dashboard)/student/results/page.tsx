@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { answersApi, examsApi, questionsApi, settingsApi } from "@/lib/api";
-import type { Answer, Exam, Question } from "@/types";
+import { examsApi, settingsApi, asApiError } from "@/lib/api";
+import { fetchMyResultsByExam } from "@/lib/exam-results";
+import type { Exam } from "@/types";
+import { DEFAULT_THRESHOLDS, parseNumberOr } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface ExamResult {
@@ -24,94 +26,64 @@ interface ExamResult {
 export default function StudentResultsPage() {
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [passThreshold] = useState(40);
+  const [passThreshold, setPassThreshold] = useState(DEFAULT_THRESHOLDS.pass_percentage);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchResults = async () => {
       try {
-        // Fetch all answers, exams, and questions in parallel
-        const [answersRes, examsRes] = await Promise.all([
-          answersApi.getMyAnswers({ limit: 500 }),
-          examsApi.getAll({ limit: 100 }),
+        const [examsRes, settingsRes] = await Promise.all([
+          examsApi.getAll({ size: 100 }),
+          settingsApi.getAll().catch(() => null),
         ]);
 
-        const answers: Answer[] = answersRes.data.items || [];
         const exams: Exam[] = examsRes.data.items || [];
-
-        // Fetch questions for each exam to build question_id → exam mapping
-        const questionToExam: Record<
-          number,
-          { examId: number; examTitle: string; subjectName: string; examTotalMarks: number }
-        > = {};
-
-        await Promise.all(
-          exams.map(async (exam) => {
-            try {
-              const questionsRes = await questionsApi.getAll({ exam_id: exam.id });
-              const questions: Question[] = questionsRes.data.items || [];
-              questions.forEach((q) => {
-                questionToExam[q.id] = {
-                  examId: exam.id,
-                  examTitle: exam.title,
-                  subjectName: exam.subject?.name || `Subject #${exam.subject_id}`,
-                  examTotalMarks: exam.total_marks,
-                };
-              });
-            } catch {
-              // Skip exams where questions can't be fetched
-            }
-          })
+        const threshold = parseNumberOr(
+          settingsRes?.data?.pass_percentage,
+          DEFAULT_THRESHOLDS.pass_percentage
         );
 
-        // Group answers by exam
-        const examMap: Record<number, ExamResult> = {};
+        // Only this student's answers, one targeted request per exam.
+        const byExam = await fetchMyResultsByExam(exams);
+        if (cancelled) return;
 
-        answers.forEach((a) => {
-          const examInfo = questionToExam[a.question_id];
-          if (!examInfo) return;
+        setPassThreshold(threshold);
 
-          if (!examMap[examInfo.examId]) {
-            examMap[examInfo.examId] = {
-              examId: examInfo.examId,
-              examTitle: examInfo.examTitle,
-              subjectName: examInfo.subjectName,
-              totalScore: 0,
-              maxMarks: examInfo.examTotalMarks,
-              percentage: 0,
-              passed: false,
-              questionCount: 0,
+        const results: ExamResult[] = exams
+          .filter((exam) => byExam.has(exam.id))
+          .map((exam) => {
+            const { totalScore, answeredCount } = byExam.get(exam.id)!;
+            const maxMarks = exam.total_marks;
+            const percentage = maxMarks > 0 ? (totalScore / maxMarks) * 100 : 0;
+            return {
+              examId: exam.id,
+              examTitle: exam.title,
+              subjectName: exam.subject?.name || `Subject #${exam.subject_id}`,
+              totalScore,
+              maxMarks,
+              percentage,
+              passed: percentage >= threshold,
+              questionCount: answeredCount,
             };
-          }
+          });
 
-          const result = examMap[examInfo.examId];
-          result.questionCount += 1;
-          if (a.score) {
-            result.totalScore += a.score.total_score;
-          }
-        });
-
-        // Get pass threshold from backend API
-        let threshold = 40;
-        try {
-          const settingsRes = await settingsApi.getAll();
-          const pp = parseInt(settingsRes.data.pass_percentage);
-          if (pp) threshold = pp;
-        } catch {}
-
-        Object.values(examMap).forEach((r) => {
-          r.percentage = r.maxMarks > 0 ? (r.totalScore / r.maxMarks) * 100 : 0;
-          r.passed = r.percentage >= threshold;
-        });
-
-        setExamResults(Object.values(examMap));
+        setExamResults(results);
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to load results");
+        if (!cancelled) {
+          console.error(err);
+          toast.error(asApiError(err)?.message || "Failed to load results");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
     fetchResults();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const getPercentageBadge = (pct: number) => {
@@ -183,6 +155,14 @@ export default function StudentResultsPage() {
                     <p className="text-sm text-muted-foreground">Questions Answered</p>
                     <p className="text-2xl font-bold">{r.questionCount}</p>
                   </div>
+                </div>
+                <div className="mt-4">
+                  <Link
+                    href={`/student/results/${r.examId}`}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    View detailed answers <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
               </CardContent>
             </Card>

@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { answersApi, questionsApi, usersApi, examsApi, settingsApi } from "@/lib/api";
+import Link from "next/link";
+import { answersApi, questionsApi, usersApi, examsApi, settingsApi, fetchAllPages } from "@/lib/api";
 import type { Answer, Question, User, Exam } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardCheck, Search, Copy, Check } from "lucide-react";
+import { ClipboardCheck, Search, Copy, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface AnswerDetail {
   answerId: number;
+  questionId: number;
   questionText: string;
   answerText: string;
   score: number | null;
@@ -41,9 +43,6 @@ export default function TeacherMarksPage() {
   const [passThreshold, setPassThreshold] = useState(40);
 
   useEffect(() => {
-  }, []);
-
-  useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch pass threshold FIRST
@@ -54,22 +53,22 @@ export default function TeacherMarksPage() {
           if (pp) { thresholdValue = pp; setPassThreshold(pp); }
         } catch {}
 
-        const [examRes, userRes, questionRes, answerRes] = await Promise.all([
-          examsApi.getAll({ limit: 500 }),
-          usersApi.getAll({ role: "student", limit: 500 }),
-          questionsApi.getAll({ limit: 500 }),
-          answersApi.getAllAnswers({ limit: 10000 }),
+        // Every list below is walked in pages of 100 and stops as soon as a page
+        // comes back short, instead of asking for 10 000 rows in one shot.
+        const [examRes, students, questions, answersData] = await Promise.all([
+          examsApi.getAll({ size: 100 }),
+          fetchAllPages<User>((page, size) => usersApi.getAll({ role: "student", page, size })),
+          fetchAllPages<Question>((page, size) => questionsApi.getAll({ page, size })),
+          fetchAllPages<Answer>((page, size) => answersApi.getAllAnswers({ page, size })),
         ]);
 
         const examList: Exam[] = examRes.data.items || [];
-        const studentList: User[] = userRes.data.items || [];
-        const questions: Question[] = questionRes.data.items || [];
-        const answersData: Answer[] = answerRes.data.items || [];
+        const studentList: User[] = students.items;
 
         setExams(examList);
 
         const questionMap: Record<number, { marks: number; exam_id: number; text: string }> = {};
-        for (const q of questions) {
+        for (const q of questions.items) {
           questionMap[q.id] = { marks: q.marks, exam_id: q.exam_id, text: q.question_text || "N/A" };
         }
 
@@ -89,7 +88,7 @@ export default function TeacherMarksPage() {
           };
         }
 
-        for (const a of answersData) {
+        for (const a of answersData.items) {
           const qInfo = questionMap[a.question_id];
           if (!qInfo) continue;
           if (!studentGroups[a.student_id]) continue;
@@ -97,6 +96,7 @@ export default function TeacherMarksPage() {
           studentGroups[a.student_id].examIds.add(qInfo.exam_id);
           studentGroups[a.student_id].answers.push({
             answerId: a.id,
+            questionId: a.question_id,
             questionText: qInfo.text,
             answerText: a.answer_text || "No answer provided",
             score: a.score ? a.score.total_score : null,
@@ -250,6 +250,12 @@ export default function TeacherMarksPage() {
                       {a.feedback && (
                         <p className="text-xs text-muted-foreground mt-2 break-words">Feedback: {a.feedback}</p>
                       )}
+                      <Link
+                        href={`/teacher/marks/${a.answerId}?question_id=${a.questionId}`}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Review / override
+                      </Link>
                     </div>
                   ))}
                 </div>

@@ -40,10 +40,10 @@ export default function AdminUsersPage() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Refresh helper for the create/delete handlers.
   const fetchUsers = async () => {
-    setLoading(true);
     try {
-      const res = await usersApi.getAll({ limit: 500 });
+      const res = await usersApi.getAll({ size: 100 });
       setUsers(res.data.items || []);
     } catch (err) {
       console.error(err);
@@ -53,7 +53,24 @@ export default function AdminUsersPage() {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    usersApi.getAll({ size: 100 })
+      .then((res) => {
+        if (!cancelled) setUsers(res.data.items || []);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        toast.error("Failed to load users");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAdd = async () => {
     if (!form.name || !form.email || !form.password) {

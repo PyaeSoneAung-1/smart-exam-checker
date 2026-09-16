@@ -5,6 +5,53 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/* ------------------------------------------------------------------ *
+ * Scoring defaults — single source of truth.
+ *
+ * Mirrors the backend's `app/api/settings.py::DEFAULTS`. Every screen that
+ * shows or edits weights/thresholds must read these, so the UI can never
+ * disagree with what the server falls back to.
+ * ------------------------------------------------------------------ */
+
+export interface ScoringWeights {
+  keyword: number;
+  semantic: number;
+  grammar: number;
+  completeness: number;
+}
+
+export const DEFAULT_WEIGHTS: ScoringWeights = {
+  keyword: 30,
+  semantic: 40,
+  grammar: 15,
+  completeness: 15,
+};
+
+export interface ScoringThresholds {
+  plagiarism: number;
+  low_score: number;
+  pass_percentage: number;
+}
+
+export const DEFAULT_THRESHOLDS: ScoringThresholds = {
+  plagiarism: 60,
+  low_score: 30,
+  pass_percentage: 40,
+};
+
+/**
+ * Parse a numeric setting, falling back only when the value is missing or
+ * not a number. Unlike `parseInt(x) || fallback`, a legitimate `0` is kept.
+ */
+export function parseNumberOr(value: unknown, fallback: number): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function formatDate(date: string | Date): string {
   return new Date(date).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',

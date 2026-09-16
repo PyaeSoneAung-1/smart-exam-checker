@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { subjectsApi, examsApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
@@ -12,6 +12,28 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Search, FileText, Users } from "lucide-react";
 import { toast } from "sonner";
 
+/** Fetch + shape this teacher's subjects and their exam counts (no React state). */
+async function loadSubjectsData(userId?: number) {
+  const [subRes, examRes] = await Promise.all([
+    subjectsApi.getAll({ size: 100 }),
+    examsApi.getAll({ size: 100 }),
+  ]);
+  const allSubjects = subRes.data.items || [];
+  const allExams = examRes.data.items || [];
+
+  // Filter subjects to only those belonging to this teacher
+  const mySubjects = allSubjects.filter((s) => s.teacher_id === userId);
+  const displaySubjects = mySubjects.length > 0 ? mySubjects : allSubjects;
+
+  // Count exams per subject
+  const counts: Record<number, number> = {};
+  for (const exam of allExams) {
+    counts[exam.subject_id] = (counts[exam.subject_id] || 0) + 1;
+  }
+
+  return { subjects: displaySubjects, examCounts: counts };
+}
+
 export default function TeacherSubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [examCounts, setExamCounts] = useState<Record<number, number>>({});
@@ -20,36 +42,26 @@ export default function TeacherSubjectsPage() {
 
   const user = useAuthStore((s) => s.user);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [subRes, examRes] = await Promise.all([
-        subjectsApi.getAll({ limit: 500 }),
-        examsApi.getAll({ limit: 500 }),
-      ]);
-      const allSubjects = subRes.data.items || [];
-      const allExams = examRes.data.items || [];
-
-      // Filter subjects to only those belonging to this teacher
-      const mySubjects = allSubjects.filter((s) => s.teacher_id === user?.id);
-      const displaySubjects = mySubjects.length > 0 ? mySubjects : allSubjects;
-
-      // Count exams per subject
-      const counts: Record<number, number> = {};
-      for (const exam of allExams) {
-        counts[exam.subject_id] = (counts[exam.subject_id] || 0) + 1;
-      }
-
-      setSubjects(displaySubjects);
-      setExamCounts(counts);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load subjects");
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    loadSubjectsData(user?.id)
+      .then((data) => {
+        if (cancelled) return;
+        setSubjects(data.subjects);
+        setExamCounts(data.examCounts);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        toast.error("Failed to load subjects");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filtered = subjects.filter((s) =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) ||

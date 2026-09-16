@@ -51,7 +51,16 @@ export default function TeacherDashboardPage() {
     );
   }
 
-  const d = data!;
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+        <p className="font-medium">Could not load the teacher dashboard</p>
+        <p className="text-sm text-muted-foreground">Please refresh the page to try again.</p>
+      </div>
+    );
+  }
+
+  const d = data;
 
   return (
     <div className="space-y-6">

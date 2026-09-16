@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
+import { fileUrl } from "@/lib/api";
 import type { User as UserType } from "@/types";
 import { getInitials, getRoleColor } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,6 +89,9 @@ function MobileMenu({
             {user && (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <Avatar className="h-10 w-10">
+                  {user.profile_photo && (
+                    <AvatarImage src={fileUrl(user.profile_photo)} alt={user.name} />
+                  )}
                   <AvatarFallback className="bg-indigo-500 text-white">
                     {getInitials(user.name)}
                   </AvatarFallback>
@@ -126,9 +130,6 @@ function MobileMenu({
                 <div className="space-y-2">
                   <Link href="/login" onClick={onClose}>
                     <Button variant="outline" className="w-full">Log in</Button>
-                  </Link>
-                  <Link href="/register" onClick={onClose}>
-                    <Button className="w-full">Get Started</Button>
                   </Link>
                 </div>
               )}
@@ -204,6 +205,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger className="hidden md:flex items-center justify-center h-9 w-9 rounded-full hover:bg-muted cursor-pointer">
                     <Avatar className="h-9 w-9">
+                      {user.profile_photo && (
+                        <AvatarImage src={fileUrl(user.profile_photo)} alt={user.name} />
+                      )}
                       <AvatarFallback className="bg-indigo-500 text-white text-sm">
                         {getInitials(user.name)}
                       </AvatarFallback>
@@ -244,6 +248,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   onClick={() => setMobileMenuOpen(true)}
                 >
                   <Avatar className="h-9 w-9">
+                    {user.profile_photo && (
+                      <AvatarImage src={fileUrl(user.profile_photo)} alt={user.name} />
+                    )}
                     <AvatarFallback className="bg-indigo-500 text-white text-sm">
                       {getInitials(user.name)}
                     </AvatarFallback>
@@ -254,9 +261,6 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={() => router.push("/login")}>
                   Log in
-                </Button>
-                <Button size="sm" className="hidden sm:inline-flex" onClick={() => router.push("/register")}>
-                  Get Started
                 </Button>
                 <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setMobileMenuOpen(true)}>
                   <Menu className="h-5 w-5" />

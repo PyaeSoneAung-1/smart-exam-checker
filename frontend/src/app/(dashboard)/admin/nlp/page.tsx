@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { settingsApi } from "@/lib/api";
+import { DEFAULT_THRESHOLDS, DEFAULT_WEIGHTS, parseNumberOr } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -125,16 +126,16 @@ function ActiveFeatures() {
 /* ── Scoring Configuration ─────────────────────────────────── */
 
 function ScoringConfig() {
-  const [weights, setWeights] = useState({ keyword: 30, semantic: 25, grammar: 15, completeness: 30 });
+  const [weights, setWeights] = useState(DEFAULT_WEIGHTS);
 
   useEffect(() => {
     settingsApi.getAll().then((res) => {
       const data = res.data;
       setWeights({
-        keyword: parseInt(data.keyword_weight) || 30,
-        semantic: parseInt(data.similarity_weight) || 25,
-        grammar: parseInt(data.grammar_weight) || 15,
-        completeness: parseInt(data.completeness_weight) || 30,
+        keyword: parseNumberOr(data.keyword_weight, DEFAULT_WEIGHTS.keyword),
+        semantic: parseNumberOr(data.similarity_weight, DEFAULT_WEIGHTS.semantic),
+        grammar: parseNumberOr(data.grammar_weight, DEFAULT_WEIGHTS.grammar),
+        completeness: parseNumberOr(data.completeness_weight, DEFAULT_WEIGHTS.completeness),
       });
     }).catch(() => {});
   }, []);
@@ -176,15 +177,15 @@ function ScoringConfig() {
 /* ── Anti-Cheating Thresholds ──────────────────────────────── */
 
 function AntiCheatingThresholds() {
-  const [thresholds, setThresholds] = useState({ plagiarism: 60, low_score: 30, pass_percentage: 40 });
+  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
 
   useEffect(() => {
     settingsApi.getAll().then((res) => {
       const data = res.data;
       setThresholds({
-        plagiarism: parseInt(data.plagiarism) || 60,
-        low_score: parseInt(data.low_score) || 30,
-        pass_percentage: parseInt(data.pass_percentage) || 40,
+        plagiarism: parseNumberOr(data.plagiarism, DEFAULT_THRESHOLDS.plagiarism),
+        low_score: parseNumberOr(data.low_score, DEFAULT_THRESHOLDS.low_score),
+        pass_percentage: parseNumberOr(data.pass_percentage, DEFAULT_THRESHOLDS.pass_percentage),
       });
     }).catch(() => {});
   }, []);

@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore } from '@/store/authStore';
 import type {
   AuthTokens, LoginRequest, RegisterRequest, User,
   Subject, Exam, Question, Answer, ScoreOverride,
@@ -15,26 +16,89 @@ export function asApiError(err: unknown): ApiErrorShape {
   return err as ApiErrorShape;
 }
 
+/**
+ * The single paginated envelope every list endpoint returns
+ * (backend `app.utils.pagination.PaginatedResponse`).
+ */
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+/** Query params accepted by the paginated list endpoints. `limit` is an alias of `size`. */
+export interface PaginationParams {
+  page?: number;
+  size?: number;
+  limit?: number;
+  skip?: number;
+}
+
+/** The largest page the backend will serve, and the page size we page with. */
+export const MAX_PAGE_SIZE = 100;
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+
+/**
+ * Origin of the backend (`NEXT_PUBLIC_API_URL` without its trailing `/api`).
+ * Used for routes that are not mounted under the `/api` client base, e.g. the
+ * authenticated uploaded-file route.
+ */
+export const API_ORIGIN = (() => {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').trim();
+  const origin = raw.replace(/\/+$/, '').replace(/\/api$/, '');
+  return origin || 'http://localhost:8000';
+})();
+
+/**
+ * Build a browser-usable URL for a stored upload (e.g. `User.profile_photo`).
+ *
+ * Uploads are no longer served from the public `/uploads/...` static path; the
+ * backend now serves them from `${API_ORIGIN}/api/files/<filename>` and requires
+ * the JWT. Plain `<img src>` requests cannot send headers, so the access token is
+ * appended as `?token=`.
+ *
+ * Accepts legacy paths (`/uploads/x.png`), current paths (`/api/files/x.png`), a
+ * bare filename, or an absolute URL (which is left untouched).
+ */
+export function fileUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  const value = path.trim();
+  if (!value) return undefined;
+
+  // Inline data / blob URLs need no rewriting.
+  if (/^(data:|blob:)/i.test(value)) return value;
+
+  const legacy = value.match(/\/uploads\/([^?#]+)/);
+  const files = value.match(/\/api\/files\/([^?#]+)/);
+  let filename: string | null = null;
+  if (legacy) filename = legacy[1];
+  else if (files) filename = files[1];
+  else if (/^https?:\/\//i.test(value)) return value; // a remote URL we do not own
+  else filename = value.replace(/^\/+/, '');
+  filename = filename.replace(/^\/+/, '');
+
+  if (!filename) return value;
+
+  const url = `${API_ORIGIN}/api/files/${filename}`;
+  const token = typeof window !== 'undefined' ? useAuthStore.getState().token : null;
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+}
 
 const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor: attach token from Zustand persist storage
+// Request interceptor: attach the token held by the Zustand auth store
+// (persisted under `auth-storage`, but read through the store so the in-memory
+// value and the persisted value can never drift apart).
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('auth-storage');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const token = parsed?.state?.token;
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      }
-    } catch {}
+  const token = useAuthStore.getState().token;
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -56,6 +120,30 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * Walk every page of a role-scoped list endpoint in chunks of `size`
+ * (backend max 100) and collect the items, stopping as soon as a page comes
+ * back short. Used only by views that genuinely aggregate over the whole set;
+ * prefer a targeted `exam_id` / `question_id` / `student_id` filter.
+ *
+ * `maxPages` bounds the loop so a bug can never hammer the backend.
+ */
+export async function fetchAllPages<T>(
+  fetchPage: (page: number, size: number) => Promise<{ data: Paginated<T> }>,
+  size: number = MAX_PAGE_SIZE,
+  maxPages = 50
+): Promise<{ items: T[]; truncated: boolean }> {
+  const items: T[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    const res = await fetchPage(page, size);
+    const batch = res.data.items ?? [];
+    items.push(...batch);
+    if (batch.length < size) return { items, truncated: false };
+    if (page === maxPages) return { items, truncated: true };
+  }
+  return { items, truncated: false };
+}
+
 // ---- Auth ----
 export const authApi = {
   login: (data: LoginRequest) => api.post<AuthTokens>('/auth/login', data),
@@ -66,8 +154,8 @@ export const authApi = {
 
 // ---- Users (Admin) ----
 export const usersApi = {
-  getAll: (params?: { skip?: number; limit?: number; role?: string }) =>
-    api.get<{ items: User[]; total: number; page: number; size: number; pages: number }>('/users', { params }),
+  getAll: (params?: PaginationParams & { role?: string }) =>
+    api.get<Paginated<User>>('/users', { params }),
   getById: (id: number) => api.get<User>(`/users/${id}`),
   create: (data: { name: string; email: string; password: string; role: string }) =>
     api.post<User>('/auth/register', data),
@@ -85,8 +173,8 @@ export const usersApi = {
 
 // ---- Subjects ----
 export const subjectsApi = {
-  getAll: (params?: { skip?: number; limit?: number }) =>
-    api.get<{ items: Subject[]; total: number; page: number; size: number; pages: number }>('/subjects', { params }),
+  getAll: (params?: PaginationParams) =>
+    api.get<Paginated<Subject>>('/subjects', { params }),
   getById: (id: number) => api.get<Subject>(`/subjects/${id}`),
   create: (data: { name: string; description: string; teacher_id?: number }) => api.post<Subject>('/subjects', data),
   update: (id: number, data: Partial<Subject>) => api.put<Subject>(`/subjects/${id}`, data),
@@ -95,13 +183,13 @@ export const subjectsApi = {
 
 // ---- Teachers (for admin lookups) ----
 export const teachersApi = {
-  getAll: () => usersApi.getAll({ role: 'teacher', limit: 100 }),
+  getAll: () => usersApi.getAll({ role: 'teacher', size: MAX_PAGE_SIZE }),
 };
 
 // ---- Exams ----
 export const examsApi = {
-  getAll: (params?: { skip?: number; limit?: number; subject_id?: number }) =>
-    api.get<{ items: Exam[]; total: number; page: number; size: number; pages: number }>('/exams', { params }),
+  getAll: (params?: PaginationParams & { subject_id?: number }) =>
+    api.get<Paginated<Exam>>('/exams', { params }),
   getById: (id: number) => api.get<Exam>(`/exams/${id}`),
   create: (data: { subject_id: number; title: string; description?: string; total_marks: number; time_limit_minutes: number; available_from?: string | null; available_until?: string | null }) =>
     api.post<Exam>('/exams', data),
@@ -111,8 +199,8 @@ export const examsApi = {
 
 // ---- Questions ----
 export const questionsApi = {
-  getAll: (params?: { exam_id?: number; skip?: number; limit?: number }) =>
-    api.get<{ items: Question[]; total: number }>('/questions', { params }),
+  getAll: (params?: PaginationParams & { exam_id?: number }) =>
+    api.get<Paginated<Question>>('/questions', { params }),
   getById: (id: number) => api.get<Question>(`/questions/${id}`),
   create: (data: { exam_id: number; question_text: string; model_answer: string; marks: number }) =>
     api.post<Question>('/questions', data),
@@ -126,12 +214,13 @@ export const answersApi = {
     api.post<Answer>('/answers/submit', data),
   submitExam: (data: { answers: { question_id: number; answer_text: string }[] }) =>
     api.post<Answer[]>('/answers/submit-exam', data),
-  getMyAnswers: (params?: { skip?: number; limit?: number }) =>
-    api.get<{ items: Answer[]; total: number }>('/answers/my-answers', { params }),
-  getQuestionAnswers: (questionId: number) =>
-    api.get<{ items: Answer[] }>(`/answers/question/${questionId}`),
-  getAllAnswers: (params?: { skip?: number; limit?: number; exam_id?: number }) =>
-    api.get<{ items: Answer[]; total: number }>('/answers', { params }),
+  getMyAnswers: (params?: PaginationParams & { exam_id?: number }) =>
+    api.get<Paginated<Answer>>('/answers/my-answers', { params }),
+  /** All student answers for one question (teacher only). */
+  getByQuestion: (questionId: number, params?: PaginationParams) =>
+    api.get<Paginated<Answer>>(`/answers/question/${questionId}`, { params }),
+  getAllAnswers: (params?: PaginationParams & { exam_id?: number; question_id?: number; student_id?: number }) =>
+    api.get<Paginated<Answer>>('/answers', { params }),
   overrideScore: (answerId: number, data: ScoreOverride) =>
     api.put<Answer>(`/answers/score/${answerId}/override`, data),
 };

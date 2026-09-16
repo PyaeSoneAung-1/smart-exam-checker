@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { dashboardApi, examsApi, answersApi, questionsApi } from "@/lib/api";
-import type { StudentDashboard, Exam, Answer } from "@/types";
+import { dashboardApi, examsApi } from "@/lib/api";
+import { fetchMyResultsByExam } from "@/lib/exam-results";
+import type { StudentDashboard, Exam } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,29 +25,16 @@ export default function StudentDashboardPage() {
       try {
         const [dash, examRes] = await Promise.all([
           dashboardApi.getStudent(),
-          examsApi.getAll({ limit: 100 }),
+          examsApi.getAll({ size: 100 }),
         ]);
         setData(dash.data);
-        setExams(examRes.data.items ?? []);
+        const examList: Exam[] = examRes.data.items ?? [];
+        setExams(examList);
 
-        try {
-          const [answerRes, qRes] = await Promise.all([
-            answersApi.getMyAnswers({ limit: 10000 }),
-            questionsApi.getAll({ limit: 500 }),
-          ]);
-          const answers: Answer[] = answerRes.data.items || [];
-          const questions = qRes.data.items || [];
-          const questionToExam: Record<number, number> = {};
-          questions.forEach((q) => { questionToExam[q.id] = q.exam_id; });
-          const completed = new Set<number>();
-          for (const answer of answers) {
-            const examId = questionToExam[answer.question_id];
-            if (examId) completed.add(examId);
-          }
-          setCompletedExamIds(completed);
-        } catch {
-          // New student — no answers yet
-        }
+        // Targeted per-exam query instead of downloading every answer and
+        // every question just to work out which exams are done.
+        const byExam = await fetchMyResultsByExam(examList);
+        setCompletedExamIds(new Set(byExam.keys()));
       } catch (err) {
         console.error(err);
       } finally {
@@ -64,7 +52,16 @@ export default function StudentDashboardPage() {
     );
   }
 
-  const d = data!;
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+        <p className="font-medium">Could not load your dashboard</p>
+        <p className="text-sm text-muted-foreground">Please refresh the page to try again.</p>
+      </div>
+    );
+  }
+
+  const d = data;
   const availableExams = exams.filter((e) => e.is_active && !completedExamIds.has(e.id));
   const completedExams = exams.filter((e) => completedExamIds.has(e.id));
 
