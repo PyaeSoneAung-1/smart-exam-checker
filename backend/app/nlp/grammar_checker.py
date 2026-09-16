@@ -19,7 +19,8 @@ class GrammarChecker:
         self._language = language or settings.LANGUAGE_TOOL_LANGUAGE
         self._remote_url = remote_url if remote_url is not None else settings.LANGUAGE_TOOL_URL
         self._tool = None
-        self._use_fallback = False
+        # Rule-based checks only when LanguageTool is disabled or unavailable
+        self._use_fallback = not settings.LANGUAGE_TOOL_ENABLED
 
     @property
     def tool(self):
@@ -146,6 +147,15 @@ class GrammarChecker:
         error_density = (error_count / word_count) * 100
 
         return round(max(0.0, 1.0 - (error_density / 10.0)), 4)
+
+    def close(self) -> None:
+        """Shut down the LanguageTool server if one was started."""
+        if self._tool is not None:
+            try:
+                self._tool.close()
+            except Exception:  # pragma: no cover - best effort cleanup
+                logger.debug("Could not close LanguageTool cleanly", exc_info=True)
+            self._tool = None
 
     def get_corrected_text(self, text: str) -> str:
         tool = self.tool

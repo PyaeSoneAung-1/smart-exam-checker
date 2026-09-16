@@ -151,6 +151,7 @@ that matter most:
 | `SEED_DEMO_DATA` | on in dev | Turn off for an empty database |
 | `UPLOADS_PUBLIC` | `false` | Files are served via the authenticated `/api/files` route |
 | `ENABLE_DOCS` | on in dev | `/docs`, `/redoc`, `/openapi.json` |
+| `LANGUAGE_TOOL_ENABLED` | `true` | `false` = built-in grammar rules only (no Java); the test suite sets it to `false` |
 
 ### Migrations (production databases)
 

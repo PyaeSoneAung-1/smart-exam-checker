@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     SENTENCE_TRANSFORMER_MODEL: str = "all-MiniLM-L6-v2"
     LANGUAGE_TOOL_URL: Optional[str] = None
     LANGUAGE_TOOL_LANGUAGE: str = "en-US"
+    # Set to false to skip spawning the Java LanguageTool server and use the
+    # built-in rule checks only (the test suite does this; also handy on hosts
+    # without a JVM).
+    LANGUAGE_TOOL_ENABLED: bool = True
 
     # AI detection (real language-model based; falls back to heuristics
     # automatically when the model is not installed)
