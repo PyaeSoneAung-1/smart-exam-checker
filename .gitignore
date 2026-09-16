@@ -9,8 +9,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-backend/smart_exam.db
+.ruff_cache/
+.mypy_cache/
+*.db
+*.sqlite3
 backend/uploads/
+backend/.jwt_secret
 
 # ── Frontend (Node) ────────────────────────────────────────────────
 frontend/node_modules/
@@ -18,6 +22,7 @@ frontend/.next/
 frontend/out/
 frontend/build/
 frontend/next-env.d.ts
+*.tsbuildinfo
 
 # ── Vercel / misc ──────────────────────────────────────────────────
 .vercel
