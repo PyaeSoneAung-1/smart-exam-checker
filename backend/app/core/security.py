@@ -3,9 +3,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from passlib.context import CryptContext
 
 from app.config import settings
+from app.core._compat import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
