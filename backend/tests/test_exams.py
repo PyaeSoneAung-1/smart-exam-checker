@@ -112,3 +112,29 @@ class TestDeleteExam:
     def test_delete_exam_as_student_forbidden(self, client, auth_student_headers, test_exam):
         resp = client.delete(f"/api/exams/{test_exam.id}", headers=auth_student_headers)
         assert resp.status_code == 403
+
+
+class TestQuestionOrdering:
+    """An exam paper must list questions in the order they were created."""
+
+    def test_questions_are_returned_in_creation_order(
+        self, client, auth_teacher_headers, test_exam
+    ):
+        created = []
+        for index in range(3):
+            resp = client.post("/api/questions/", json={
+                "exam_id": test_exam.id,
+                "question_text": f"Question number {index}",
+                "model_answer": f"Model answer number {index}",
+                "marks": 5,
+            }, headers=auth_teacher_headers)
+            assert resp.status_code == 201
+            created.append(resp.json()["id"])
+
+        resp = client.get(
+            f"/api/questions/?exam_id={test_exam.id}&size=50", headers=auth_teacher_headers
+        )
+        assert resp.status_code == 200
+        ids = [item["id"] for item in resp.json()["items"]]
+        assert ids == sorted(ids), f"questions came back out of order: {ids}"
+        assert set(created).issubset(set(ids))

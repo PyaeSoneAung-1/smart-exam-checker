@@ -101,7 +101,9 @@ def list_questions(
         else:
             query = query.filter(Question.id == -1)
 
-    query = query.order_by(Question.created_at.desc())
+    # Exam papers must present questions in the order the teacher created
+    # them (newest-first ordering used to scramble the paper).
+    query = query.order_by(Question.id.asc())
     result = paginate_query(query, db, pagination)
     schema = QuestionStudentResponse if current_user.role == UserRole.STUDENT else QuestionResponse
     result.items = [schema.model_validate(q).model_dump() for q in result.items]
