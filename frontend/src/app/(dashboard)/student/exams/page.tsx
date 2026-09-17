@@ -3,20 +3,24 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { examsApi } from "@/lib/api";
-import { fetchMyResultsByExam } from "@/lib/exam-results";
+import { fetchMyResultsByExam, type MyExamResult } from "@/lib/exam-results";
 import type { Exam } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, FileText, Play, CheckCircle, CalendarDays } from "lucide-react";
+import { BookOpen, Clock, FileText, Play, CheckCircle, CalendarDays, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { getExamWindowStatus, formatUtcDateTime } from "@/lib/utils";
 
 export default function StudentExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
-  const [completedExamIds, setCompletedExamIds] = useState<Set<number>>(new Set());
+  const [myResults, setMyResults] = useState<Map<number, MyExamResult>>(new Map());
   const [myTotalScore, setMyTotalScore] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // An exam counts as completed only when every question has an answer.
+  const isComplete = (id: number) => myResults.get(id)?.complete === true;
+  const completedCount = exams.filter((e) => isComplete(e.id)).length;
 
   useEffect(() => {
     let cancelled = false;
@@ -33,7 +37,7 @@ export default function StudentExamsPage() {
         const byExam = await fetchMyResultsByExam(examList);
         if (cancelled) return;
 
-        setCompletedExamIds(new Set(byExam.keys()));
+        setMyResults(byExam);
         const totalScore = [...byExam.values()].reduce((sum, r) => sum + r.totalScore, 0);
         setMyTotalScore(Math.round(totalScore * 100) / 100);
       } catch (err) {
@@ -70,7 +74,7 @@ export default function StudentExamsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-green-600">{completedExamIds.size}</p>
+            <p className="text-2xl font-bold text-green-600">{completedCount}</p>
             <p className="text-sm text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
@@ -94,7 +98,9 @@ export default function StudentExamsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {exams.map((exam) => {
-            const isCompleted = completedExamIds.has(exam.id);
+            const result = myResults.get(exam.id);
+            const isCompleted = result?.complete === true;
+            const inProgress = !isCompleted && (result?.answeredCount ?? 0) > 0;
             const status = getExamWindowStatus(exam);
             const canTake = status === "open";
             const windowText =
@@ -128,6 +134,12 @@ export default function StudentExamsPage() {
                   {isCompleted ? (
                     <Badge className="bg-green-100 text-green-700 w-fit">
                       <CheckCircle className="h-3 w-3 mr-1" /> Completed
+                      {result && exam.total_marks > 0 &&
+                        ` · ${((result.totalScore / exam.total_marks) * 100).toFixed(1)}%`}
+                    </Badge>
+                  ) : inProgress ? (
+                    <Badge className="bg-amber-100 text-amber-700 w-fit">
+                      In progress · {result?.answeredCount}/{result?.questionCount} answered
                     </Badge>
                   ) : status === "upcoming" ? (
                     <Badge className="bg-blue-100 text-blue-700 w-fit">
@@ -142,9 +154,16 @@ export default function StudentExamsPage() {
                   )}
                   <div className="pt-2 mt-auto">
                     {isCompleted ? (
-                      <Link href={`/student/results`}>
+                      <Link href={`/student/results/${exam.id}`}>
                         <Button className="w-full" variant="outline">
                           <CheckCircle className="h-4 w-4 mr-2" /> View Results
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </Link>
+                    ) : inProgress ? (
+                      <Link href={`/student/exams/${exam.id}`}>
+                        <Button className="w-full" variant="outline">
+                          <Play className="h-4 w-4 mr-2" /> Continue Exam
                         </Button>
                       </Link>
                     ) : (
