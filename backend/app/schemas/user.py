@@ -37,6 +37,8 @@ class UserResponse(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    # Computed from locked_until — lets the admin UI offer an "unlock" action.
+    is_locked: bool = False
     profile_photo: Optional[str] = None
     created_at: datetime
 

@@ -42,6 +42,11 @@ _ADDED_COLUMNS = {
     ],
     "users": [
         ("token_version", "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"),
+        (
+            "failed_login_attempts",
+            "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0",
+        ),
+        ("locked_until", "ALTER TABLE users ADD COLUMN locked_until {ts}"),
     ],
 }
 

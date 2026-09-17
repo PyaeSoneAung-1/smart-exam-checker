@@ -6,6 +6,8 @@ export interface User {
   email: string;
   role: UserRole;
   is_active: boolean;
+  /** True while a failed-login lockout is in effect (cleared by an admin unlock). */
+  is_locked?: boolean;
   profile_photo?: string;
   created_at: string;
 }

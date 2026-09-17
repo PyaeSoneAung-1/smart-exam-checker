@@ -239,6 +239,24 @@ def activate_user(
     return user
 
 
+@router.post("/{user_id}/unlock", response_model=UserResponse)
+def unlock_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Clear a login lockout so the user can sign in again (admin only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 @router.put("/{user_id}/profile-photo", response_model=UserResponse)
 def upload_profile_photo(
     user_id: int,

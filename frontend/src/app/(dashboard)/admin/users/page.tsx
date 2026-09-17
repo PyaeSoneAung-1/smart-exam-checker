@@ -17,7 +17,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Trash2, UserCheck, UserX, Users, Upload, FileUp, X } from "lucide-react";
+import { Search, Plus, Trash2, UserCheck, UserX, Users, Upload, FileUp, X, Unlock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface CsvUser {
@@ -38,6 +38,7 @@ export default function AdminUsersPage() {
   const [csvUsers, setCsvUsers] = useState<CsvUser[]>([]);
   const [csvFileName, setCsvFileName] = useState("");
   const [importing, setImporting] = useState(false);
+  const [unlockingId, setUnlockingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Refresh helper for the create/delete handlers.
@@ -105,6 +106,20 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch {
       toast.error("Failed to update user");
+    }
+  };
+
+  const handleUnlock = async (user: User) => {
+    setUnlockingId(user.id);
+    try {
+      await usersApi.unlock(user.id);
+      toast.success("Account unlocked");
+      fetchUsers();
+    } catch (err) {
+      const msg = asApiError(err)?.response?.data?.detail;
+      toast.error(typeof msg === "string" ? msg : "Failed to unlock account");
+    } finally {
+      setUnlockingId(null);
     }
   };
 
@@ -396,11 +411,16 @@ export default function AdminUsersPage() {
                     <TableCell>{u.email}</TableCell>
                     <TableCell><Badge className={getRoleBadge(u.role)}>{u.role}</Badge></TableCell>
                     <TableCell>
-                      {u.is_active ? (
-                        <Badge className="bg-green-100 text-green-700">Active</Badge>
-                      ) : (
-                        <Badge className="bg-red-100 text-red-700">Inactive</Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {u.is_active ? (
+                          <Badge className="bg-green-100 text-green-700">Active</Badge>
+                        ) : (
+                          <Badge className="bg-red-100 text-red-700">Inactive</Badge>
+                        )}
+                        {u.is_locked && (
+                          <Badge className="bg-amber-100 text-amber-700">Locked</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">{new Date(u.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
@@ -408,6 +428,21 @@ export default function AdminUsersPage() {
                         <Button size="sm" variant="outline" onClick={() => handleToggleActive(u)}>
                           {u.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                         </Button>
+                        {u.is_locked && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUnlock(u)}
+                            disabled={unlockingId === u.id}
+                          >
+                            {unlockingId === u.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Unlock className="h-4 w-4" />
+                            )}
+                            Unlock
+                          </Button>
+                        )}
                         <Button size="sm" variant="destructive" onClick={() => handleDelete(u)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>

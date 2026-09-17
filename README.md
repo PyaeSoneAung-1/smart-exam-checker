@@ -34,6 +34,12 @@ Hardening and cleanup pass driven by a full security/quality review:
   credentials) and defaults to localhost origins outside production.
 - Rate limiting is actually wired up (`slowapi`): 120 req/min per IP, 10/min on
   login/refresh; GZip is enabled.
+- **Login lockout per account**: 5 wrong passwords lock the account for 15
+  minutes (`LOGIN_MAX_FAILED_ATTEMPTS` / `LOGIN_LOCKOUT_MINUTES`). The counter
+  resets on a successful sign-in, an expired lock clears itself, and an admin can
+  clear it early with `POST /api/users/{id}/unlock` (the admin user list exposes
+  `is_locked`). The 401 body never differs between an unknown email and a wrong
+  password, so accounts cannot be enumerated.
 - Uploads are private: files are served through the authenticated
   `GET /api/files/{path}` (Bearer header or `?token=` for `<img>`), with
   path-traversal protection and magic-byte content validation. Static
@@ -381,6 +387,9 @@ models, runs as a non-root user and has a `/health` healthcheck.
   (in production there are no allowed origins until you set it).
 - **429 Too Many Requests** — you hit the rate limit (10/min on login). Wait a
   minute or set `RATE_LIMIT_ENABLED=false` while developing.
+- **423 Locked on login** — 5 wrong passwords locked that account for 15 minutes.
+  Wait for the lock to expire, or sign in as an admin and press **Unlock** in
+  `/admin/users` (or `POST /api/users/{id}/unlock`).
 - **spaCy / sentence-transformers slow on first request** — the models download
   on first use (~13 MB spaCy, ~90 MB MiniLM, ~330 MB distilgpt2). Pre-download
   them (the Dockerfile does) or install `requirements-ai.txt`.
@@ -398,4 +407,7 @@ models, runs as a non-root user and has a `/health` healthcheck.
   with no lexical overlap are surfaced for manual review rather than flagged.
 - AI-generated-text detection is probabilistic and can misjudge very regular
   prose; answers under ~20 characters are never flagged.
-- Rate limiting and WebSocket connections are per-process (single worker).
+- Rate limiting and WebSocket connections are per-process (single worker), so
+  the login lockout counter is only as durable as the database it is stored in —
+  it is per account, not per IP, and an attacker who can hit many accounts at once
+  is still only throttled by the per-IP rate limit.

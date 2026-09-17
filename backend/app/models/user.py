@@ -25,6 +25,14 @@ class User(Base):
     profile_photo = Column(String(500), nullable=True)
     # Bumped on logout/password change — invalidates every token issued before.
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # Login lockout: consecutive failed passwords, and the moment the lock lifts.
+    failed_login_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    locked_until = Column(DateTime, nullable=True)
+
+    @property
+    def is_locked(self) -> bool:
+        """True while a failed-login lockout is in effect."""
+        return self.locked_until is not None and self.locked_until > utcnow()
 
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"

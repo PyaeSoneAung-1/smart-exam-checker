@@ -1,15 +1,17 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Add the parent directory to sys.path so we can import app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database import Base
 from app.config import settings
-from app.models import User, Subject, Exam, Question, StudentAnswer, Score  # noqa: F401
+from app.database import Base
+from app.models import Exam, Question, Score, StudentAnswer, Subject, User  # noqa: F401
 
 config = context.config
 

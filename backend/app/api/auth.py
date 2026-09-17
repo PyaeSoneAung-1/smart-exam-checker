@@ -1,4 +1,6 @@
 import logging
+import math
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -16,6 +18,7 @@ from app.database import get_db
 from app.limiter import rate_limit
 from app.models.user import User
 from app.schemas.user import ChangePassword, Token, TokenRefresh, UserCreate, UserLogin, UserResponse
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,22 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def _token_claims(user: User) -> dict:
     """Claims shared by access and refresh tokens."""
     return {"sub": str(user.id), "role": user.role.value, "ver": int(user.token_version or 0)}
+
+
+def _lock_minutes_left(locked_until) -> int:
+    """Whole minutes (at least 1) until an account lock expires."""
+    seconds = (locked_until - utcnow()).total_seconds()
+    return max(1, math.ceil(seconds / 60))
+
+
+def _lockout_error(minutes_left: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_423_LOCKED,
+        detail=(
+            f"Account locked after {settings.LOGIN_MAX_FAILED_ATTEMPTS} failed sign-in attempts. "
+            f"Try again in {minutes_left} minute(s) or ask an administrator to unlock it."
+        ),
+    )
 
 
 def _issue_tokens(user: User) -> Token:
@@ -74,8 +93,47 @@ def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db
     )
 
     user = db.query(User).filter(User.email == credentials.email).first()
+
+    # Per-account lockout, on top of the per-IP rate limit. A locked account is
+    # refused before the password is even checked.
+    if user and user.locked_until is not None:
+        if user.locked_until > utcnow():
+            logger.warning("Sign-in attempt on locked account %s", credentials.email)
+            raise _lockout_error(_lock_minutes_left(user.locked_until))
+        # The lock has expired — start the account with a clean slate.
+        user.locked_until = None
+        user.failed_login_attempts = 0
+        db.commit()
+
     if not user or not verify_password(credentials.password, user.hashed_password):
-        logger.info("Failed login for %s", credentials.email)
+        # The 401 body is identical whether or not the email exists, so failed
+        # logins cannot be used to enumerate accounts.
+        # Only active accounts are counted: a deactivated account answers like an
+        # unknown email, so neither status nor lock history leaks.
+        if user and user.is_active and settings.LOGIN_LOCKOUT_ENABLED:
+            attempts = int(user.failed_login_attempts or 0) + 1
+            remaining = settings.LOGIN_MAX_FAILED_ATTEMPTS - attempts
+            if remaining <= 0:
+                user.failed_login_attempts = 0
+                user.locked_until = utcnow() + timedelta(minutes=settings.LOGIN_LOCKOUT_MINUTES)
+                db.commit()
+                logger.warning(
+                    "Account %s locked for %d minute(s) after %d failed attempts",
+                    credentials.email,
+                    settings.LOGIN_LOCKOUT_MINUTES,
+                    settings.LOGIN_MAX_FAILED_ATTEMPTS,
+                )
+                raise _lockout_error(settings.LOGIN_LOCKOUT_MINUTES)
+            user.failed_login_attempts = attempts
+            db.commit()
+            logger.info(
+                "Failed login for %s (%d of %d attempts used)",
+                credentials.email,
+                attempts,
+                settings.LOGIN_MAX_FAILED_ATTEMPTS,
+            )
+        else:
+            logger.info("Failed login for %s", credentials.email)
         raise invalid_credentials
 
     if not user.is_active:
@@ -83,6 +141,12 @@ def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
+
+    # A successful sign-in clears the failed-attempt counter.
+    if user.failed_login_attempts or user.locked_until is not None:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
 
     return _issue_tokens(user)
 

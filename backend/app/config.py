@@ -50,7 +50,7 @@ def _persisted_dev_secret() -> str:
 class Settings(BaseSettings):
     # ── Core ────────────────────────────────────────────────
     PROJECT_NAME: str = "Smart Exam Answer Checker"
-    PROJECT_VERSION: str = "1.1.0"
+    PROJECT_VERSION: str = "1.2.0"
     API_V1_PREFIX: str = "/api"
 
     # "development" | "production" | "test"
@@ -89,6 +89,15 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_DEFAULT: str = "120/minute"
     RATE_LIMIT_LOGIN: str = "10/minute"
+
+    # Login lockout (per account, on top of the per-IP rate limit above): after
+    # LOGIN_MAX_FAILED_ATTEMPTS wrong passwords the account is locked for
+    # LOGIN_LOCKOUT_MINUTES; the counter resets on a successful sign-in and an
+    # administrator can unlock it early. Set LOGIN_LOCKOUT_ENABLED=false to keep
+    # only the IP rate limit.
+    LOGIN_LOCKOUT_ENABLED: bool = True
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_MINUTES: int = 15
 
     # ── Demo data / seed accounts ──────────────────────────
     # Demo seeding is skipped in production unless explicitly enabled.

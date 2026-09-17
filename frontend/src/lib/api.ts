@@ -162,6 +162,7 @@ export const usersApi = {
   update: (id: number, data: Partial<User>) => api.put<User>(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
   activate: (id: number) => api.put<User>(`/users/${id}/activate`),
+  unlock: (id: number) => api.post<User>(`/users/${id}/unlock`),
   bulkImport: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
