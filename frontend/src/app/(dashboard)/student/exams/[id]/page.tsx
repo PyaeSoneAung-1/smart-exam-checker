@@ -30,6 +30,11 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { cn, formatUtcDateTime } from "@/lib/utils";
 
+interface QuestionResult {
+  question: Question;
+  answer: Answer;
+}
+
 export default function TakeExamPage() {
   return (
     <ErrorBoundary>
@@ -47,9 +52,13 @@ function ExamContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [results, setResults] = useState<Answer[]>([]);
+  const [results, setResults] = useState<QuestionResult[]>([]);
+  // Answers already stored for this exam (a student may be part-way through,
+  // or may have finished it in an earlier session).
+  const [existing, setExisting] = useState<Record<number, Answer>>({});
   const [currentIdx, setCurrentIdx] = useState(0);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [notAvailable, setNotAvailable] = useState<string | null>(null);
   const submittedRef = useRef(false);
@@ -62,9 +71,37 @@ function ExamContent() {
         const qRes = await questionsApi.getAll({ exam_id: Number(id), size: 100 });
         const qs = qRes.data.items || [];
         setQuestions(qs);
+
+        // Restore what this student already submitted for this exam.
+        let mine: Answer[] = [];
+        try {
+          const mineRes = await answersApi.getMyAnswers({ exam_id: Number(id), size: 100 });
+          mine = mineRes.data.items || [];
+        } catch {
+          // Not fatal: start from a blank paper.
+        }
+
         const init: Record<number, string> = {};
+        const already: Record<number, Answer> = {};
         qs.forEach((q: Question) => { init[q.id] = ""; });
+        for (const a of mine) {
+          already[a.question_id] = a;
+          init[a.question_id] = a.answer_text || "";
+        }
         setAnswers(init);
+        setExisting(already);
+
+        // The exam is fully answered → show the graded result instead of an
+        // empty paper (the API rejects duplicate submissions anyway).
+        if (qs.length > 0 && Object.keys(already).length >= qs.length) {
+          submittedRef.current = true;
+          setResults(
+            qs
+              .map((q: Question) => ({ question: q, answer: already[q.id] }))
+              .filter((r): r is QuestionResult => Boolean(r.answer))
+          );
+          setSubmitted(true);
+        }
       } catch (err) {
         const apiErr = asApiError(err);
         const status = apiErr?.response?.status;
@@ -120,20 +157,54 @@ function ExamContent() {
 
   const handleSubmit = useCallback(async () => {
     if (submitting || submittedRef.current) return;
+
+    // Skip questions this student already answered and any left blank — the API
+    // rejects empty answers and duplicates, which used to abort the whole exam
+    // submission half-way through.
+    const targets = questions.filter(
+      (q) => !existing[q.id] && (answers[q.id] || "").trim()
+    );
+
+    if (targets.length === 0) {
+      if (questions.length > 0 && Object.keys(existing).length >= questions.length) {
+        // Everything was already submitted earlier — just show the results.
+        submittedRef.current = true;
+        setResults(
+          questions
+            .map((q) => ({ question: q, answer: existing[q.id] }))
+            .filter((r): r is QuestionResult => Boolean(r.answer))
+        );
+        setSubmitted(true);
+      } else {
+        toast.error("Please answer at least one question before submitting.");
+      }
+      return;
+    }
+
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      const allResults: Answer[] = [];
-      for (const q of questions) {
+      const saved: Record<number, Answer> = { ...existing };
+      for (const q of targets) {
         const res = await answersApi.submit({
           question_id: q.id,
-          answer_text: answers[q.id] || "",
+          answer_text: answers[q.id],
         });
-        allResults.push(res.data);
+        saved[q.id] = res.data;
       }
-      setResults(allResults);
+      setExisting(saved);
+      setResults(
+        questions
+          .map((q) => ({ question: q, answer: saved[q.id] }))
+          .filter((r): r is QuestionResult => Boolean(r.answer))
+      );
       setSubmitted(true);
-      toast.success("Exam submitted successfully!");
+      const skipped = questions.length - Object.keys(saved).length;
+      if (skipped > 0) {
+        toast.success(`Submitted! ${skipped} unanswered question${skipped === 1 ? "" : "s"} scored 0.`);
+      } else {
+        toast.success("Exam submitted successfully!");
+      }
     } catch (err) {
       const msg = asApiError(err)?.response?.data?.detail || "Failed to submit exam";
       toast.error(typeof msg === "string" ? msg : "Already submitted or error occurred");
@@ -141,14 +212,29 @@ function ExamContent() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, questions, answers]);
+  }, [submitting, questions, answers, existing]);
+
+  const answeredCount = Object.values(answers).filter((a) => a.trim()).length;
+  const remainingUnanswered = questions.filter(
+    (q) => !existing[q.id] && !(answers[q.id] || "").trim()
+  ).length;
+
+  // Ask for confirmation when questions are left unanswered, so a partial
+  // submission is never a surprise.
+  const requestSubmit = useCallback(() => {
+    if (submitting || submittedRef.current) return;
+    if (remainingUnanswered > 0) {
+      setShowSubmitConfirm(true);
+      return;
+    }
+    handleSubmit();
+  }, [handleSubmit, remainingUnanswered, submitting]);
 
   const handleTimeEnd = useCallback(() => {
     toast.warning("Time is up! Auto-submitting your exam...");
     handleSubmit();
   }, [handleSubmit]);
 
-  const answeredCount = Object.values(answers).filter((a) => a.trim()).length;
   const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
   const currentQuestion = questions[currentIdx];
 
@@ -187,8 +273,10 @@ function ExamContent() {
 
   // Results view
   if (submitted && results.length > 0) {
-    const totalScore = results.reduce((sum: number, r: Answer) => sum + (r.score?.total_score || 0), 0);
-    const totalMarks = questions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+    const totalScore = results.reduce((sum, r) => sum + (r.answer.score?.total_score || 0), 0);
+    const examTotalMarks = questions.reduce((sum, q) => sum + q.marks, 0);
+    const answeredMarks = results.reduce((sum, r) => sum + r.question.marks, 0);
+    const missing = questions.length - results.length;
 
     return (
       <div className="max-w-3xl mx-auto space-y-6">
@@ -198,31 +286,41 @@ function ExamContent() {
               <CheckCircle className="h-6 w-6" /> Exam Submitted!
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{totalScore.toFixed(1)} / {totalMarks}</p>
+          <CardContent className="space-y-1">
+            <p className="text-2xl font-bold">{totalScore.toFixed(1)} / {examTotalMarks}</p>
             <p className="text-muted-foreground">
-              {totalScore >= totalMarks * 0.5 ? "🎉 Great job!" : "📚 Keep studying!"}
+              {missing > 0
+                ? `Answered ${results.length} of ${questions.length} questions (${answeredMarks} marks attempted).`
+                : totalScore >= examTotalMarks * 0.5
+                  ? "🎉 Great job!"
+                  : "📚 Keep studying!"}
             </p>
+            {missing > 0 && (
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                {missing} question{missing === 1 ? "" : "s"} left unanswered and scored 0.
+              </p>
+            )}
           </CardContent>
         </Card>
 
-        {results.map((r: Answer, idx: number) => (
-          <Card key={r.id}>
+        {results.map((r, idx) => (
+          <Card key={r.answer.id}>
             <CardHeader>
-              <CardTitle className="text-base">Q{idx + 1}: {questions[idx]?.question_text}</CardTitle>
+              <CardTitle className="text-base">Q{idx + 1}: {r.question.question_text}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="text-sm"><strong>Your Answer:</strong> {r.answer_text}</p>
-              {r.score && (
+              <p className="text-sm"><strong>Your Answer:</strong> {r.answer.answer_text}</p>
+              {r.answer.score && (
                 <div className="space-y-1">
                   <div className="flex gap-4 text-sm">
-                    <span>Keywords: {((r.score.keyword_score || 0) * 100).toFixed(0)}%</span>
-                    <span>Similarity: {((r.score.similarity_score || 0) * 100).toFixed(0)}%</span>
-                    <span>Grammar: {((r.score.grammar_score || 0) * 100).toFixed(0)}%</span>
+                    <span>Keywords: {((r.answer.score.keyword_score || 0) * 100).toFixed(0)}%</span>
+                    <span>Similarity: {((r.answer.score.similarity_score || 0) * 100).toFixed(0)}%</span>
+                    <span>Grammar: {((r.answer.score.grammar_score || 0) * 100).toFixed(0)}%</span>
+                    <span>Completeness: {((r.answer.score.completeness_score || 0) * 100).toFixed(0)}%</span>
                   </div>
-                  <Badge className="text-lg">{r.score.total_score?.toFixed(1)} / {questions[idx]?.marks}</Badge>
-                  {r.score.feedback && (
-                    <p className="text-sm text-muted-foreground mt-2">{r.score.feedback}</p>
+                  <Badge className="text-lg">{r.answer.score.total_score?.toFixed(1)} / {r.question.marks}</Badge>
+                  {r.answer.score.feedback && (
+                    <p className="text-sm text-muted-foreground mt-2">{r.answer.score.feedback}</p>
                   )}
                 </div>
               )}
@@ -230,8 +328,9 @@ function ExamContent() {
           </Card>
         ))}
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <Link href="/student/exams"><Button variant="outline">Back to Exams</Button></Link>
+          <Link href={`/student/results/${exam.id}`}><Button variant="outline">Open in My Results</Button></Link>
           <Link href="/student/results"><Button>View All Results</Button></Link>
         </div>
       </div>
@@ -240,6 +339,31 @@ function ExamContent() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {/* Partial-submission confirmation */}
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit with unanswered questions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have {remainingUnanswered} unanswered question
+              {remainingUnanswered === 1 ? "" : "s"}. They will be submitted with 0 marks.
+              You cannot change your answers after submitting.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep answering</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSubmitConfirm(false);
+                handleSubmit();
+              }}
+            >
+              Submit anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Leave confirmation dialog */}
       <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
         <AlertDialogContent>
@@ -343,8 +467,9 @@ function ExamContent() {
         </Card>
       )}
 
-      {/* Navigation buttons */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Navigation buttons — "Submit Exam" is always visible so a student can
+          finish early without paging through every question first. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button
           variant="outline"
           disabled={currentIdx === 0}
@@ -354,21 +479,27 @@ function ExamContent() {
           Previous
         </Button>
 
-        {currentIdx < questions.length - 1 ? (
-          <Button onClick={() => setCurrentIdx((i) => i + 1)}>
-            Next
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        ) : (
+        <div className="flex items-center gap-3">
+          {remainingUnanswered > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {remainingUnanswered} unanswered
+            </span>
+          )}
+          {currentIdx < questions.length - 1 && (
+            <Button variant="outline" onClick={() => setCurrentIdx((i) => i + 1)}>
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          )}
           <Button
-            onClick={handleSubmit}
+            onClick={requestSubmit}
             disabled={submitting}
             className="bg-green-600 hover:bg-green-700"
           >
             <Send className="h-4 w-4 mr-2" />
             {submitting ? "Submitting..." : "Submit Exam"}
           </Button>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,13 @@
-import { answersApi, MAX_PAGE_SIZE } from "@/lib/api";
+import { answersApi, MAX_PAGE_SIZE, questionsApi } from "@/lib/api";
 import type { Answer, Exam } from "@/types";
 
 export interface MyExamResult {
   totalScore: number;
   answeredCount: number;
+  /** How many questions the exam has (0 when it could not be read). */
+  questionCount: number;
+  /** True when every question of the exam has an answer. */
+  complete: boolean;
 }
 
 /** Safety cap on pages of `MAX_PAGE_SIZE` we walk per exam. */
@@ -25,6 +29,14 @@ export async function fetchMyResultsByExam(
     exams.map(async (exam) => {
       let totalScore = 0;
       let answeredCount = 0;
+      let questionCount = 0;
+      try {
+        // size=1 keeps the payload tiny — we only need `total`.
+        const qRes = await questionsApi.getAll({ exam_id: exam.id, size: 1 });
+        questionCount = qRes.data.total ?? 0;
+      } catch {
+        questionCount = 0;
+      }
       try {
         for (let page = 1; page <= MAX_PAGES; page++) {
           const res = await answersApi.getMyAnswers({
@@ -44,7 +56,12 @@ export async function fetchMyResultsByExam(
         return;
       }
       if (answeredCount > 0) {
-        results.set(exam.id, { totalScore, answeredCount });
+        results.set(exam.id, {
+          totalScore,
+          answeredCount,
+          questionCount,
+          complete: questionCount > 0 && answeredCount >= questionCount,
+        });
       }
     })
   );

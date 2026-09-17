@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { dashboardApi, examsApi } from "@/lib/api";
-import { fetchMyResultsByExam } from "@/lib/exam-results";
+import { fetchMyResultsByExam, type MyExamResult } from "@/lib/exam-results";
 import type { StudentDashboard, Exam } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { MotionCard, staggerContainer, fadeUp } from "@/components/shared/motion
 export default function StudentDashboardPage() {
   const [data, setData] = useState<StudentDashboard | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
-  const [completedExamIds, setCompletedExamIds] = useState<Set<number>>(new Set());
+  const [myResults, setMyResults] = useState<Map<number, MyExamResult>>(new Map());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function StudentDashboardPage() {
         // Targeted per-exam query instead of downloading every answer and
         // every question just to work out which exams are done.
         const byExam = await fetchMyResultsByExam(examList);
-        setCompletedExamIds(new Set(byExam.keys()));
+        setMyResults(byExam);
       } catch (err) {
         console.error(err);
       } finally {
@@ -62,8 +62,11 @@ export default function StudentDashboardPage() {
   }
 
   const d = data;
-  const availableExams = exams.filter((e) => e.is_active && !completedExamIds.has(e.id));
-  const completedExams = exams.filter((e) => completedExamIds.has(e.id));
+  // An exam counts as completed only when every question has an answer;
+  // partially answered exams stay in the list, flagged as in progress.
+  const isComplete = (id: number) => myResults.get(id)?.complete === true;
+  const availableExams = exams.filter((e) => e.is_active && !isComplete(e.id));
+  const completedExams = exams.filter((e) => isComplete(e.id));
 
   const statCards = [
     { label: "Exams Taken", value: d.total_exams_taken, icon: ClipboardCheck, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-600/10 dark:bg-blue-500/15" },
@@ -139,7 +142,7 @@ export default function StudentDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {availableExams.length > 0 ? (
-              availableExams.slice(0, 4).map((e) => (
+              availableExams.map((e) => (
                 <Link
                   key={e.id}
                   href={`/student/exams/${e.id}`}
@@ -147,7 +150,15 @@ export default function StudentDashboardPage() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{e.title}</p>
-                    <p className="text-xs text-muted-foreground">{e.total_marks} marks · {e.time_limit_minutes} min</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(() => {
+                        const r = myResults.get(e.id);
+                        if (r && r.answeredCount > 0) {
+                          return `In progress — ${r.answeredCount}/${r.questionCount} answered`;
+                        }
+                        return `${e.total_marks} marks · ${e.time_limit_minutes} min`;
+                      })()}
+                    </p>
                   </div>
                   <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -158,19 +169,44 @@ export default function StudentDashboardPage() {
             {completedExams.length > 0 && (
               <div className="pt-2">
                 <p className="mb-2 text-xs font-medium text-muted-foreground">Completed</p>
-                {completedExams.slice(0, 4).map((e) => (
+                {completedExams.map((e) => {
+                  const result = myResults.get(e.id);
+                  const pct = e.total_marks > 0 && result
+                    ? (result.totalScore / e.total_marks) * 100
+                    : null;
+                  return (
+                    <Link
+                      key={e.id}
+                      href={`/student/results/${e.id}`}
+                      title="Open this exam's result"
+                      className="group mb-2 flex items-center justify-between gap-2 rounded-xl border bg-muted/30 p-3 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-emerald-500/40 duration-300"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{e.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {result ? `${result.answeredCount}/${result.questionCount} answered` : "Submitted"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {pct !== null && (
+                          <Badge variant="secondary" className="tabular-nums">{pct.toFixed(1)}%</Badge>
+                        )}
+                        <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </Link>
+                  );
+                })}
+                {completedExams.length > 0 && (
                   <Link
-                    key={e.id}
                     href="/student/results"
-                    className="group mb-2 flex items-center justify-between rounded-xl border bg-muted/30 p-3 transition-all hover:shadow-md hover:-translate-y-0.5 duration-300"
+                    className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />
-                      <p className="truncate text-sm font-medium">{e.title}</p>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0">Done</Badge>
+                    View all results <ArrowRight className="h-3 w-3" />
                   </Link>
-                ))}
+                )}
               </div>
             )}
           </CardContent>
